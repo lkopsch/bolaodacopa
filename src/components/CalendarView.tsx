@@ -4,7 +4,7 @@ import { useMemo } from 'react'
 import { Calendar, Clock, MapPin } from 'lucide-react'
 import type { Jogo, Resultado } from '@/types'
 import { getFaseLabel, FASES_ORDER } from '@/lib/excel-parser'
-import { GRUPOS, getTimesDoGrupo } from '@/lib/grupos'
+import { GRUPOS } from '@/lib/grupos'
 import clsx from 'clsx'
 
 const PLAYOFF_GAMES: Record<string, number> = {
@@ -67,16 +67,45 @@ export function CalendarView({ jogos, resultados }: { jogos: Jogo[]; resultados:
     )
   }, [jogos, maxDbJogo])
 
-  const gruposData = useMemo(() => {
-    const gruposMap = new Map<string, Jogo[]>()
-    for (const j of jogos) {
-      if (j.fase !== 'Grupos') continue
-      const key = j.grupo ?? 'Outros'
-      if (!gruposMap.has(key)) gruposMap.set(key, [])
-      gruposMap.get(key)!.push(j)
-    }
-    return Array.from(gruposMap.entries()).sort((a, b) => a[0].localeCompare(b[0]))
+  const groupGamesSorted = useMemo(() => {
+    return jogos
+      .filter((j) => j.fase === 'Grupos')
+      .sort((a, b) => {
+        if (!a.data_hora) return 1
+        if (!b.data_hora) return -1
+        return new Date(a.data_hora).getTime() - new Date(b.data_hora).getTime()
+      })
   }, [jogos])
+
+  const gamesByDate = useMemo(() => {
+    const map = new Map<string, { label: string; games: Jogo[] }>()
+    for (const j of groupGamesSorted) {
+      const key = j.data_hora ? new Date(j.data_hora).toISOString().slice(0, 10) : 'sem-data'
+      if (!map.has(key)) {
+        const d = j.data_hora ? new Date(j.data_hora) : null
+        const label = d
+          ? d.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })
+          : 'Sem data'
+        map.set(key, { label, games: [] })
+      }
+      map.get(key)!.games.push(j)
+    }
+    return Array.from(map.entries())
+      .filter(([k]) => k !== 'sem-data')
+      .sort(([a], [b]) => a.localeCompare(b))
+      .concat(Array.from(map.entries()).filter(([k]) => k === 'sem-data'))
+  }, [groupGamesSorted])
+
+  const nextGameNum = useMemo(() => {
+    const now = new Date()
+    for (const j of groupGamesSorted) {
+      if (!j.data_hora) continue
+      if (new Date(j.data_hora) > now && !resultadoMap.has(j.jogo_numero)) {
+        return j.jogo_numero
+      }
+    }
+    return null
+  }, [groupGamesSorted, resultadoMap])
 
   const gruposList = useMemo(
     () => Object.entries(GRUPOS).sort((a, b) => a[0].localeCompare(b[0])),
@@ -124,27 +153,23 @@ export function CalendarView({ jogos, resultados }: { jogos: Jogo[]; resultados:
                 <span className="text-xs text-stone-500">{games.length} jogos</span>
               </div>
 
-              {gruposData.length === 0 ? (
+              {gamesByDate.length === 0 ? (
                 <div className="text-center py-12 text-stone-500">
                   <p className="text-3xl mb-2">📅</p>
                   <p className="text-sm">Nenhum jogo cadastrado. Faça o upload da primeira planilha.</p>
                 </div>
               ) : (
                 <div className="space-y-6">
-                  {gruposData.map(([grupo, grupoJogos]) => (
-                    <div key={grupo}>
+                  {gamesByDate.map(([, { label, games: dayGames }]) => (
+                    <div key={label}>
                       <div className="flex items-center gap-3 mb-3">
-                        <span className="text-xs font-black text-emerald-400 bg-emerald-950/60 border border-emerald-800/50 px-2.5 py-1 rounded-lg">
-                          GRUPO {grupo}
+                        <span className="text-sm font-bold text-stone-300 uppercase tracking-wider">
+                          {label}
                         </span>
                         <div className="flex-1 h-px bg-stone-800" />
-                        <span className="text-xs text-stone-600">
-                          {grupoJogos.filter((j) => resultadoMap.has(j.jogo_numero)).length}/{grupoJogos.length}
-                        </span>
                       </div>
-
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {grupoJogos.map((jogo) => {
+                        {dayGames.map((jogo) => {
                           const dt = formatDateTime(jogo.data_hora)
                           const resultado = resultadoMap.get(jogo.jogo_numero)
                           return (
@@ -158,6 +183,7 @@ export function CalendarView({ jogos, resultados }: { jogos: Jogo[]; resultados:
                               dt={dt}
                               estadio={jogo.estadio}
                               resultado={resultado}
+                              isNext={jogo.jogo_numero === nextGameNum}
                             />
                           )
                         })}
@@ -219,6 +245,7 @@ function GameCard({
   estadio,
   resultado,
   placeholder,
+  isNext,
 }: {
   jogo_numero: number
   fase: string
@@ -229,12 +256,14 @@ function GameCard({
   estadio: string | null
   resultado: Resultado | undefined
   placeholder?: boolean
+  isNext?: boolean
 }) {
   return (
     <div
       className={clsx(
         'bg-stone-900 border rounded-xl p-4 transition-all',
-        resultado ? 'border-emerald-500/20' : 'border-stone-800'
+        resultado ? 'border-emerald-500/20' : 'border-stone-800',
+        isNext && !resultado && 'border-amber-500/40 ring-1 ring-amber-500/20'
       )}
     >
       <div className="flex items-center gap-2 mb-3 flex-wrap">
@@ -243,6 +272,11 @@ function GameCard({
         </span>
         {grupo && (
           <span className="text-xs text-stone-600">Grupo {grupo}</span>
+        )}
+        {isNext && !resultado && (
+          <span className="text-[10px] font-bold text-amber-400 bg-amber-950/60 border border-amber-800/50 px-1.5 py-0.5 rounded">
+            PRÓXIMO
+          </span>
         )}
       </div>
 
