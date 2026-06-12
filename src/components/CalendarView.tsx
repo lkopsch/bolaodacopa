@@ -4,6 +4,7 @@ import { useMemo } from 'react'
 import { Calendar, Clock, MapPin } from 'lucide-react'
 import type { Jogo, Resultado } from '@/types'
 import { getFaseLabel, FASES_ORDER } from '@/lib/excel-parser'
+import { GRUPOS, getTimesDoGrupo } from '@/lib/grupos'
 import clsx from 'clsx'
 
 const PLAYOFF_GAMES: Record<string, number> = {
@@ -77,8 +78,42 @@ export function CalendarView({ jogos, resultados }: { jogos: Jogo[]; resultados:
     return Array.from(gruposMap.entries()).sort((a, b) => a[0].localeCompare(b[0]))
   }, [jogos])
 
+  const gruposList = useMemo(
+    () => Object.entries(GRUPOS).sort((a, b) => a[0].localeCompare(b[0])),
+    []
+  )
+
   return (
     <div className="space-y-8">
+      <section>
+        <h2 className="text-lg font-bold mb-5 flex items-center gap-2">
+          <Calendar className="text-emerald-400" size={20} />
+          Grupos da Copa
+        </h2>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          {gruposList.map(([letra, times]) => (
+            <div
+              key={letra}
+              className="bg-stone-800/50 border border-stone-700/50 rounded-xl p-4"
+            >
+              <span className="text-xs font-black text-emerald-400 bg-emerald-950/60 border border-emerald-800/50 px-2 py-0.5 rounded-lg inline-block mb-3">
+                GRUPO {letra}
+              </span>
+              <ul className="space-y-1.5">
+                {times.map((time) => (
+                  <li key={time} className="text-sm text-white font-medium flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/60 shrink-0" />
+                    {time}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <div className="h-px bg-stone-800" />
+
       {phases.map(([fase, games]) => {
         if (fase === 'Grupos') {
           return (

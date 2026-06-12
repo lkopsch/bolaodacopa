@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Upload, Save, Trash2, LogOut, CheckCircle, AlertCircle, Lock, Users, Calendar } from 'lucide-react'
+import { Upload, Save, Trash2, LogOut, CheckCircle, AlertCircle, Lock, Users, Calendar, RefreshCw } from 'lucide-react'
 import type { Jogo, Resultado } from '@/types'
 import clsx from 'clsx'
 
@@ -32,6 +32,7 @@ export default function AdminPage() {
   const [loadingJogos, setLoadingJogos] = useState(false)
   const [edits, setEdits] = useState<EditState>({})
   const [saving, setSaving] = useState<number | null>(null)
+  const [fixingGrupos, setFixingGrupos] = useState(false)
 
   // Participantes tab state
   const [participantes, setParticipantes] = useState<string[]>([])
@@ -350,6 +351,37 @@ export default function AdminPage() {
                 </div>
               )}
             </div>
+
+            {jogos.length > 0 && (
+              <div className="mb-6 flex items-center gap-3">
+                <button
+                  onClick={async () => {
+                    setFixingGrupos(true)
+                    try {
+                      const res = await fetch('/api/setup-grupos', {
+                        method: 'POST',
+                        headers: { 'x-admin-password': password },
+                      })
+                      const data = await res.json()
+                      showToast(data.message, res.ok)
+                      if (res.ok) await fetchJogos()
+                    } catch {
+                      showToast('Erro ao corrigir grupos', false)
+                    } finally {
+                      setFixingGrupos(false)
+                    }
+                  }}
+                  disabled={fixingGrupos}
+                  className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-stone-800 hover:bg-stone-700 text-stone-400 hover:text-white transition-all disabled:opacity-50"
+                >
+                  <RefreshCw size={12} className={fixingGrupos ? 'animate-spin' : ''} />
+                  {fixingGrupos ? 'Corrigindo...' : 'Corrigir grupos'}
+                </button>
+                <span className="text-xs text-stone-600">
+                  Aplica a lista manual de 12 grupos nos jogos da fase de grupos
+                </span>
+              </div>
+            )}
 
             {loadingJogos ? (
               <div className="text-center py-16 text-stone-500">

@@ -132,7 +132,7 @@ export default function Home() {
                 tab === t ? 'bg-emerald-600 text-white shadow' : 'text-stone-400 hover:text-white'
               )}
             >
-              {t === 'ranking' ? '🏅 Ranking' : t === 'palpites' ? '📋 Palpites' : '📅 Jogos'}
+              {t === 'ranking' ? '🏅 Ranking' : t === 'palpites' ? '📋 Palpites' : '🏆 A Copa'}
             </button>
           ))}
         </div>
@@ -165,10 +165,6 @@ export default function Home() {
 
             {tab === 'jogos' && (
               <div className="bg-stone-900 border border-stone-800 rounded-2xl p-6">
-                <h2 className="text-lg font-bold mb-6 flex items-center gap-2">
-                  <Calendar className="text-emerald-400" size={20} />
-                  Calendário da Copa
-                </h2>
                 <CalendarView jogos={jogos} resultados={resultados} />
               </div>
             )}
