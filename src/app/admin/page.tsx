@@ -242,6 +242,32 @@ export default function AdminPage() {
   const gruposOrdenados = Object.keys(jogosByGrupo).sort((a, b) => a.localeCompare(b))
   const totalComResultado = jogos.filter((j) => j.resultado).length
 
+  // ─── Live scoring helpers ─────────────────────────────────────────────────────
+
+  const atualizarLive = useCallback(async (jogo_numero: number, gol_a: number, gol_b: number) => {
+    try {
+      await fetch('/api/live', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+        body: JSON.stringify({ jogo_numero, gol_a: Math.max(0, gol_a), gol_b: Math.max(0, gol_b) }),
+      })
+    } catch {}
+  }, [password])
+
+  const finalizarLive = useCallback(async (jogo_numero: number) => {
+    setEndingLive(jogo_numero)
+    try {
+      await fetch('/api/live', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+        body: JSON.stringify({ jogo_numero, action: 'end' }),
+      })
+      setLiveGames((prev) => prev.filter((g) => g.jogo_numero !== jogo_numero))
+      fetchJogos()
+    } catch {}
+    setEndingLive(null)
+  }, [password, fetchJogos])
+
   // ─── Login screen ────────────────────────────────────────────────────────────
 
   if (!authed) {
@@ -278,32 +304,6 @@ export default function AdminPage() {
       </div>
     )
   }
-
-  // ─── Live scoring helpers ─────────────────────────────────────────────────────
-
-  const atualizarLive = useCallback(async (jogo_numero: number, gol_a: number, gol_b: number) => {
-    try {
-      await fetch('/api/live', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
-        body: JSON.stringify({ jogo_numero, gol_a: Math.max(0, gol_a), gol_b: Math.max(0, gol_b) }),
-      })
-    } catch {}
-  }, [password])
-
-  const finalizarLive = useCallback(async (jogo_numero: number) => {
-    setEndingLive(jogo_numero)
-    try {
-      await fetch('/api/live', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
-        body: JSON.stringify({ jogo_numero, action: 'end' }),
-      })
-      setLiveGames((prev) => prev.filter((g) => g.jogo_numero !== jogo_numero))
-      fetchJogos()
-    } catch {}
-    setEndingLive(null)
-  }, [password, fetchJogos])
 
   // ─── Admin layout ─────────────────────────────────────────────────────────────
 
