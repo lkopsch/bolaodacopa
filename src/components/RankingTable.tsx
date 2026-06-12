@@ -94,9 +94,10 @@ export function RankingTable({ ranking }: RankingTableProps) {
       </table>
 
       {/* Legend */}
-      <div className="mt-4 pt-4 border-t border-stone-800 flex gap-4 text-xs text-stone-500">
+      <div className="mt-4 pt-4 border-t border-stone-800 flex gap-4 text-xs text-stone-500 flex-wrap">
         <span><span className="text-amber-400">⚽ Placar</span> = acertou o placar exato (10pts)</span>
         <span><span className="text-emerald-400">✓ Resultado</span> = acertou vitória/empate (6pts)</span>
+        <span><span className="text-blue-400">❶ Lado</span> = acertou um dos lados (1pt)</span>
       </div>
     </div>
   )

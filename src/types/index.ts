@@ -56,7 +56,7 @@ export interface ParsedSheet {
 }
 
 // Scoring system:
-// Errou tudo (mas palpitou) = 1 ponto
+// Acertou um lado do placar = 1 ponto
 // Acertou resultado (vitória/empate) = 6 pontos
 // Acertou placar exato = 10 pontos
 export function calcularPontos(palpite: Palpite, resultado: Resultado): number {
@@ -82,5 +82,9 @@ export function calcularPontos(palpite: Palpite, resultado: Resultado): number {
     return 6
   }
 
-  return 1
+  if (golsA === resA || golsB === resB) {
+    return 1
+  }
+
+  return 0
 }
