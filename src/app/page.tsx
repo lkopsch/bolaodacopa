@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { Trophy, Search, ChevronDown, Calendar } from 'lucide-react'
 import type { Palpite, Resultado, ParticipanteRanking, Jogo } from '@/types'
 import { getFaseLabel, FASES_ORDER } from '@/lib/excel-parser'
@@ -24,20 +24,22 @@ export default function Home() {
   const [faseFiltro, setFaseFiltro] = useState<string>('todas')
   const [participanteFiltro, setParticipanteFiltro] = useState<string>('todos')
   const [positionChanges, setPositionChanges] = useState<Record<string, number>>({})
+  const prevRankingRef = useRef<ParticipanteRanking[]>([])
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (isInitial = false) => {
     try {
       const [palpitesRes, jogosRes] = await Promise.all([
         fetch('/api/palpites').then((r) => r.json()),
         fetch('/api/jogos').then((r) => r.json()),
       ])
       if (palpitesRes.error) throw new Error(palpitesRes.error)
-      const oldRanking = ranking
+      const oldRanking = isInitial ? [] : prevRankingRef.current
       setPalpites(palpitesRes.palpites)
       setResultados(palpitesRes.resultados)
-      setRanking(palpitesRes.ranking)
       setJogos(jogosRes)
-      if (oldRanking.length > 0) {
+      setRanking(palpitesRes.ranking)
+      prevRankingRef.current = palpitesRes.ranking
+      if (!isInitial && oldRanking.length > 0) {
         const changes: Record<string, number> = {}
         const oldPos = new Map(oldRanking.map((r, i) => [r.nome, i]))
         for (let i = 0; i < palpitesRes.ranking.length; i++) {
@@ -52,11 +54,13 @@ export default function Home() {
       }
     } catch (e) {
       setError((e as Error).message)
+    } finally {
+      if (isInitial) setLoading(false)
     }
-  }, [ranking])
+  }, [])
 
   useEffect(() => {
-    fetchData()
+    fetchData(true)
   }, [fetchData])
 
   // Live polling for ranking updates
