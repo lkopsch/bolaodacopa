@@ -41,7 +41,7 @@ export async function GET() {
     if (resultado) {
       entry.pontos_total += pontos
       if (pontos === 10) entry.acertos_placar++
-      else if (pontos === 6) entry.acertos_resultado++
+      else if (pontos >= 5) entry.acertos_resultado++
       else entry.erros++
     }
   }

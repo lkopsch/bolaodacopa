@@ -55,36 +55,36 @@ export interface ParsedSheet {
   palpites: Palpite[]
 }
 
-// Scoring system:
-// Acertou um lado do placar = 1 ponto
-// Acertou resultado (vitória/empate) = 6 pontos
-// Acertou placar exato = 10 pontos
+// Scoring system (cumulativo):
+// 1pt por lado do placar acertado
+// 5pt por resultado (vitória/empate) acertado
+// 3pt bônus por placar exato
+// Total máx = 1+1+5+3 = 10
 export function calcularPontos(palpite: Palpite, resultado: Resultado): number {
   const golsA = palpite.gol_a
   const golsB = palpite.gol_b
   const resA = resultado.gol_a
   const resB = resultado.gol_b
 
-  if (golsA === resA && golsB === resB) {
-    if (resultado.penalti_a !== null && palpite.penalti_a !== null) {
-      if (palpite.penalti_a === resultado.penalti_a && palpite.penalti_b === resultado.penalti_b) {
-        return 10
-      }
-      return 6
-    }
-    return 10
-  }
+  let pontos = 0
+
+  if (golsA === resA) pontos += 1
+  if (golsB === resB) pontos += 1
 
   const palpiteOutcome = golsA > golsB ? 'A' : golsB > golsA ? 'B' : 'E'
   const resOutcome = resA > resB ? 'A' : resB > resA ? 'B' : 'E'
 
-  if (palpiteOutcome === resOutcome) {
-    return 6
+  if (palpiteOutcome === resOutcome) pontos += 5
+
+  if (golsA === resA && golsB === resB) {
+    if (resultado.penalti_a !== null && palpite.penalti_a !== null) {
+      if (palpite.penalti_a === resultado.penalti_a && palpite.penalti_b === resultado.penalti_b) {
+        pontos += 3
+      }
+    } else {
+      pontos += 3
+    }
   }
 
-  if (golsA === resA || golsB === resB) {
-    return 1
-  }
-
-  return 0
+  return pontos
 }

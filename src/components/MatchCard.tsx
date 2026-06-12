@@ -23,7 +23,7 @@ export function MatchCard({ palpite, resultado, showPoints = true, compact = fal
       'hover:border-stone-700 hover:bg-stone-850',
       compact ? 'p-3' : 'p-4',
       pontos === 10 && 'border-amber-500/30 bg-amber-950/20',
-      pontos === 6 && 'border-emerald-500/20',
+      pontos !== null && pontos >= 5 && pontos < 10 && 'border-emerald-500/20',
     )}>
       {/* Header */}
       <div className="flex items-center justify-between mb-3">

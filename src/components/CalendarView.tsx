@@ -77,10 +77,18 @@ export function CalendarView({ jogos, resultados }: { jogos: Jogo[]; resultados:
       })
   }, [jogos])
 
+  function dateKey(iso: string): string {
+    const d = new Date(iso)
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${y}-${m}-${day}`
+  }
+
   const gamesByDate = useMemo(() => {
     const map = new Map<string, { label: string; games: Jogo[] }>()
     for (const j of groupGamesSorted) {
-      const key = j.data_hora ? new Date(j.data_hora).toISOString().slice(0, 10) : 'sem-data'
+      const key = j.data_hora ? dateKey(j.data_hora) : 'sem-data'
       if (!map.has(key)) {
         const d = j.data_hora ? new Date(j.data_hora) : null
         const label = d
