@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Upload, Save, Trash2, LogOut, CheckCircle, AlertCircle, Lock, Users, Calendar, RefreshCw } from 'lucide-react'
+import { Upload, Save, Trash2, LogOut, CheckCircle, AlertCircle, Lock, Users, Calendar, RefreshCw, Pencil, X } from 'lucide-react'
 import type { Jogo, Resultado } from '@/types'
 import clsx from 'clsx'
 
@@ -33,6 +33,9 @@ export default function AdminPage() {
   const [edits, setEdits] = useState<EditState>({})
   const [saving, setSaving] = useState<number | null>(null)
   const [fixingGrupos, setFixingGrupos] = useState(false)
+  const [editGameNum, setEditGameNum] = useState<number | null>(null)
+  const [editForm, setEditForm] = useState({ grupo: '', data_hora: '', estadio: '' })
+  const [savingGame, setSavingGame] = useState(false)
 
   // Participantes tab state
   const [participantes, setParticipantes] = useState<string[]>([])
@@ -507,6 +510,22 @@ export default function AdminPage() {
                                   <span className="text-emerald-400 text-xs">✓</span>
                                 </>
                               )}
+
+                              <button
+                                onClick={() => {
+                                  const dt = jogo.data_hora ? new Date(jogo.data_hora) : null
+                                  setEditForm({
+                                    grupo: jogo.grupo ?? '',
+                                    data_hora: dt ? dt.toISOString().slice(0, 16) : '',
+                                    estadio: jogo.estadio ?? '',
+                                  })
+                                  setEditGameNum(jogo.jogo_numero)
+                                }}
+                                className="p-1.5 rounded-lg text-stone-600 hover:text-emerald-400 hover:bg-emerald-950/30 transition-colors"
+                                title="Editar jogo"
+                              >
+                                <Pencil size={14} />
+                              </button>
                             </div>
                           </div>
                         )
@@ -516,6 +535,104 @@ export default function AdminPage() {
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {/* ── Edit Game Modal ─────────────────────────────────────────────────────── */}
+        {editGameNum !== null && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+            <div className="bg-stone-900 border border-stone-700 rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl">
+              <div className="flex items-center justify-between mb-5">
+                <h3 className="font-bold text-white">Editar Jogo #{editGameNum}</h3>
+                <button
+                  onClick={() => setEditGameNum(null)}
+                  className="p-1 rounded-lg text-stone-500 hover:text-white hover:bg-stone-800 transition-colors"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs text-stone-400 mb-1.5">Grupo</label>
+                  <select
+                    value={editForm.grupo}
+                    onChange={(e) => setEditForm((f) => ({ ...f, grupo: e.target.value }))}
+                    className="w-full bg-stone-800 border border-stone-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                  >
+                    <option value="">Sem grupo</option>
+                    {'ABCDEFGHIJKL'.split('').map((l) => (
+                      <option key={l} value={l}>Grupo {l}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs text-stone-400 mb-1.5">Data e Hora</label>
+                  <input
+                    type="datetime-local"
+                    value={editForm.data_hora}
+                    onChange={(e) => setEditForm((f) => ({ ...f, data_hora: e.target.value }))}
+                    className="w-full bg-stone-800 border border-stone-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs text-stone-400 mb-1.5">Estádio</label>
+                  <input
+                    type="text"
+                    value={editForm.estadio}
+                    onChange={(e) => setEditForm((f) => ({ ...f, estadio: e.target.value }))}
+                    placeholder="Ex: Estádio Nacional"
+                    className="w-full bg-stone-800 border border-stone-700 rounded-lg px-3 py-2 text-sm text-white placeholder-stone-500 focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-2 mt-6">
+                <button
+                  onClick={() => setEditGameNum(null)}
+                  className="flex-1 px-4 py-2 rounded-lg text-sm font-semibold bg-stone-800 text-stone-400 hover:text-white transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={async () => {
+                    setSavingGame(true)
+                    try {
+                      const dataHoraISO = editForm.data_hora
+                        ? new Date(editForm.data_hora).toISOString()
+                        : null
+                      const res = await fetch('/api/jogos', {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+                        body: JSON.stringify({
+                          jogo_numero: editGameNum,
+                          grupo: editForm.grupo || null,
+                          data_hora: dataHoraISO,
+                          estadio: editForm.estadio || null,
+                        }),
+                      })
+                      const data = await res.json()
+                      showToast(data.error ?? 'Jogo atualizado!', res.ok)
+                      if (res.ok) {
+                        setEditGameNum(null)
+                        await fetchJogos()
+                      }
+                    } catch {
+                      showToast('Erro ao salvar jogo', false)
+                    } finally {
+                      setSavingGame(false)
+                    }
+                  }}
+                  disabled={savingGame}
+                  className="flex-1 px-4 py-2 rounded-lg text-sm font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  <Save size={14} />
+                  {savingGame ? 'Salvando...' : 'Salvar'}
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
