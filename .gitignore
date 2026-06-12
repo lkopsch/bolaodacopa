@@ -37,3 +37,6 @@ Thumbs.db
 
 # TypeScript build info
 *.tsbuildinfo
+
+# AI context (project-specific, not for repo)
+memory.md

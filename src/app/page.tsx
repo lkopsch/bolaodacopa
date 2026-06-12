@@ -1,20 +1,22 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { Trophy, Search, ChevronDown } from 'lucide-react'
-import type { Palpite, Resultado, ParticipanteRanking } from '@/types'
+import { Trophy, Search, ChevronDown, Calendar } from 'lucide-react'
+import type { Palpite, Resultado, ParticipanteRanking, Jogo } from '@/types'
 import { getFaseLabel, FASES_ORDER } from '@/lib/excel-parser'
 import { RankingTable } from '@/components/RankingTable'
 import { MatchCard } from '@/components/MatchCard'
+import { CalendarView } from '@/components/CalendarView'
 import clsx from 'clsx'
 
-type Tab = 'ranking' | 'palpites'
+type Tab = 'ranking' | 'palpites' | 'jogos'
 
 export default function Home() {
   const [tab, setTab] = useState<Tab>('ranking')
   const [palpites, setPalpites] = useState<Palpite[]>([])
   const [resultados, setResultados] = useState<Resultado[]>([])
   const [ranking, setRanking] = useState<ParticipanteRanking[]>([])
+  const [jogos, setJogos] = useState<Jogo[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -23,13 +25,16 @@ export default function Home() {
   const [participanteFiltro, setParticipanteFiltro] = useState<string>('todos')
 
   useEffect(() => {
-    fetch('/api/palpites')
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.error) throw new Error(data.error)
-        setPalpites(data.palpites)
-        setResultados(data.resultados)
-        setRanking(data.ranking)
+    Promise.all([
+      fetch('/api/palpites').then((r) => r.json()),
+      fetch('/api/jogos').then((r) => r.json()),
+    ])
+      .then(([palpitesData, jogosData]) => {
+        if (palpitesData.error) throw new Error(palpitesData.error)
+        setPalpites(palpitesData.palpites)
+        setResultados(palpitesData.resultados)
+        setRanking(palpitesData.ranking)
+        setJogos(jogosData)
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false))
@@ -118,7 +123,7 @@ export default function Home() {
 
       <div className="max-w-6xl mx-auto px-4 py-6">
         <div className="flex gap-1 bg-stone-900 border border-stone-800 rounded-xl p-1 mb-6 w-fit">
-          {(['ranking', 'palpites'] as Tab[]).map((t) => (
+          {(['ranking', 'palpites', 'jogos'] as Tab[]).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -127,7 +132,7 @@ export default function Home() {
                 tab === t ? 'bg-emerald-600 text-white shadow' : 'text-stone-400 hover:text-white'
               )}
             >
-              {t === 'ranking' ? '🏅 Ranking' : '📋 Palpites'}
+              {t === 'ranking' ? '🏅 Ranking' : t === 'palpites' ? '📋 Palpites' : '📅 Jogos'}
             </button>
           ))}
         </div>
@@ -155,6 +160,16 @@ export default function Home() {
                   Classificação Geral
                 </h2>
                 <RankingTable ranking={ranking} />
+              </div>
+            )}
+
+            {tab === 'jogos' && (
+              <div className="bg-stone-900 border border-stone-800 rounded-2xl p-6">
+                <h2 className="text-lg font-bold mb-6 flex items-center gap-2">
+                  <Calendar className="text-emerald-400" size={20} />
+                  Calendário da Copa
+                </h2>
+                <CalendarView jogos={jogos} resultados={resultados} />
               </div>
             )}
 
