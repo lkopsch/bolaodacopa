@@ -1,0 +1,23 @@
+@import "tailwindcss";
+
+:root {
+  --background: #0c0c0e;
+  --surface: #111113;
+}
+
+body {
+  background-color: var(--background);
+  color: white;
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #111; }
+::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #555; }
+
+.grass-header {
+  background: 
+    radial-gradient(ellipse at 50% 0%, rgba(22, 101, 52, 0.3) 0%, transparent 70%),
+    linear-gradient(180deg, #0c1a0f 0%, #0c0c0e 100%);
+}
