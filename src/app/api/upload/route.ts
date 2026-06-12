@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { parseExcelFile } from '@/lib/excel-parser'
+import { parseExcelFile, parseJogosFromExcel } from '@/lib/excel-parser'
 import { supabaseAdmin } from '@/lib/supabase'
 
 export const runtime = 'nodejs'
 
 export async function POST(request: NextRequest) {
   try {
-    // Check admin auth
     const authHeader = request.headers.get('x-admin-password')
     if (authHeader !== process.env.ADMIN_PASSWORD) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
@@ -25,23 +24,45 @@ export async function POST(request: NextRequest) {
     }
 
     const buffer = await file.arrayBuffer()
-    const { palpites, participantes } = parseExcelFile(buffer)
+    const { participante, palpites } = parseExcelFile(buffer)
 
     if (palpites.length === 0) {
       return NextResponse.json({ error: 'Nenhum palpite encontrado na planilha' }, { status: 400 })
     }
 
-    // Clear existing palpites and insert new ones
-    const { error: deleteError } = await supabaseAdmin.from('palpites').delete().neq('id', 0)
+    // Replace only this participant's palpites (accumulate, not overwrite all)
+    const nomeParticipante = palpites[0].nome_participante
+
+    const { error: deleteError } = await supabaseAdmin
+      .from('palpites')
+      .delete()
+      .eq('nome_participante', nomeParticipante)
+
     if (deleteError) throw deleteError
 
     const { error: insertError } = await supabaseAdmin.from('palpites').insert(palpites)
     if (insertError) throw insertError
 
+    // Seed jogos table on first upload (group stage only)
+    const { count } = await supabaseAdmin
+      .from('jogos')
+      .select('*', { count: 'exact', head: true })
+
+    if ((count ?? 0) === 0) {
+      const jogos = parseJogosFromExcel(buffer)
+      if (jogos.length > 0) {
+        const { error: jogosError } = await supabaseAdmin.from('jogos').insert(jogos)
+        if (jogosError) {
+          console.error('Erro ao semear jogos:', jogosError)
+          // Non-fatal: palpites were already saved
+        }
+      }
+    }
+
     return NextResponse.json({
       success: true,
-      message: `${palpites.length} palpites importados de ${participantes.length} participante(s)`,
-      participantes,
+      message: `${palpites.length} palpites importados para ${participante}`,
+      participante,
       total: palpites.length,
     })
   } catch (err: any) {

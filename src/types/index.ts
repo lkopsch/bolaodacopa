@@ -14,6 +14,18 @@ export interface Palpite {
   critica: string | null
 }
 
+export interface Jogo {
+  id?: number
+  jogo_numero: number
+  fase: string
+  grupo: string | null
+  pais_a: string
+  pais_b: string
+  data_hora: string | null
+  estadio: string | null
+  created_at?: string
+}
+
 export interface Resultado {
   id?: number
   jogo_numero: number
@@ -39,11 +51,11 @@ export interface ParticipanteRanking {
 }
 
 export interface ParsedSheet {
-  participantes: string[]
+  participante: string
   palpites: Palpite[]
 }
 
-// Scoring system
+// Scoring system:
 // Errou tudo (mas palpitou) = 1 ponto
 // Acertou resultado (vitória/empate) = 6 pontos
 // Acertou placar exato = 10 pontos
@@ -53,20 +65,16 @@ export function calcularPontos(palpite: Palpite, resultado: Resultado): number {
   const resA = resultado.gol_a
   const resB = resultado.gol_b
 
-  // Exact score
   if (golsA === resA && golsB === resB) {
-    // Check penalties if applicable
     if (resultado.penalti_a !== null && palpite.penalti_a !== null) {
       if (palpite.penalti_a === resultado.penalti_a && palpite.penalti_b === resultado.penalti_b) {
         return 10
       }
-      // Got regulation right but not penalties = 6
       return 6
     }
     return 10
   }
 
-  // Got outcome right (win/draw)
   const palpiteOutcome = golsA > golsB ? 'A' : golsB > golsA ? 'B' : 'E'
   const resOutcome = resA > resB ? 'A' : resB > resA ? 'B' : 'E'
 
@@ -74,6 +82,5 @@ export function calcularPontos(palpite: Palpite, resultado: Resultado): number {
     return 6
   }
 
-  // Participated but got nothing right
   return 1
 }
