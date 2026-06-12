@@ -57,6 +57,20 @@ CREATE POLICY "Service write palpites" ON palpites FOR ALL USING (auth.role() = 
 CREATE POLICY "Service write resultados" ON resultados FOR ALL USING (auth.role() = 'service_role');
 CREATE POLICY "Service write jogos" ON jogos FOR ALL USING (auth.role() = 'service_role');
 
+-- Ao Vivo table: tracks live match scores
+CREATE TABLE IF NOT EXISTS jogos_ao_vivo (
+  jogo_numero INT NOT NULL UNIQUE,
+  gol_a INT NOT NULL DEFAULT 0,
+  gol_b INT NOT NULL DEFAULT 0,
+  minuto INT NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'ao_vivo',
+  iniciado_em TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE jogos_ao_vivo ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Public read ao_vivo" ON jogos_ao_vivo FOR SELECT USING (true);
+CREATE POLICY "Service write ao_vivo" ON jogos_ao_vivo FOR ALL USING (auth.role() = 'service_role');
+
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_palpites_jogo ON palpites(jogo_numero);
 CREATE INDEX IF NOT EXISTS idx_palpites_nome ON palpites(nome_participante);

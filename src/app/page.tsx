@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { Trophy, Search, ChevronDown, Calendar } from 'lucide-react'
 import type { Palpite, Resultado, ParticipanteRanking, Jogo } from '@/types'
 import { getFaseLabel, FASES_ORDER } from '@/lib/excel-parser'
@@ -23,22 +23,56 @@ export default function Home() {
   const [searchParticipante, setSearchParticipante] = useState('')
   const [faseFiltro, setFaseFiltro] = useState<string>('todas')
   const [participanteFiltro, setParticipanteFiltro] = useState<string>('todos')
+  const [positionChanges, setPositionChanges] = useState<Record<string, number>>({})
+
+  const fetchData = useCallback(async () => {
+    try {
+      const [palpitesRes, jogosRes] = await Promise.all([
+        fetch('/api/palpites').then((r) => r.json()),
+        fetch('/api/jogos').then((r) => r.json()),
+      ])
+      if (palpitesRes.error) throw new Error(palpitesRes.error)
+      const oldRanking = ranking
+      setPalpites(palpitesRes.palpites)
+      setResultados(palpitesRes.resultados)
+      setRanking(palpitesRes.ranking)
+      setJogos(jogosRes)
+      if (oldRanking.length > 0) {
+        const changes: Record<string, number> = {}
+        const oldPos = new Map(oldRanking.map((r, i) => [r.nome, i]))
+        for (let i = 0; i < palpitesRes.ranking.length; i++) {
+          const nome = palpitesRes.ranking[i].nome
+          const oldIdx = oldPos.get(nome)
+          if (oldIdx !== undefined && oldIdx !== i) {
+            changes[nome] = oldIdx - i
+          }
+        }
+        setPositionChanges(changes)
+        setTimeout(() => setPositionChanges({}), 5000)
+      }
+    } catch (e) {
+      setError((e as Error).message)
+    }
+  }, [ranking])
 
   useEffect(() => {
-    Promise.all([
-      fetch('/api/palpites').then((r) => r.json()),
-      fetch('/api/jogos').then((r) => r.json()),
-    ])
-      .then(([palpitesData, jogosData]) => {
-        if (palpitesData.error) throw new Error(palpitesData.error)
-        setPalpites(palpitesData.palpites)
-        setResultados(palpitesData.resultados)
-        setRanking(palpitesData.ranking)
-        setJogos(jogosData)
-      })
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false))
-  }, [])
+    fetchData()
+  }, [fetchData])
+
+  // Live polling for ranking updates
+  useEffect(() => {
+    const checkLive = async () => {
+      try {
+        const res = await fetch('/api/live')
+        const data = await res.json()
+        if (data.em_andamento > 0) {
+          fetchData()
+        }
+      } catch {}
+    }
+    const interval = setInterval(checkLive, 15000)
+    return () => clearInterval(interval)
+  }, [fetchData])
 
   const resultadoMap = useMemo(
     () => new Map(resultados.map((r) => [r.jogo_numero, r])),
@@ -159,7 +193,7 @@ export default function Home() {
                   <Trophy className="text-amber-400" size={20} />
                   Classificação Geral
                 </h2>
-                <RankingTable ranking={ranking} />
+                <RankingTable ranking={ranking} positionChanges={positionChanges} />
               </div>
             )}
 

@@ -1,7 +1,7 @@
 'use client'
 
-import { useMemo } from 'react'
-import { Calendar, Clock, MapPin } from 'lucide-react'
+import { useMemo, useState, useEffect } from 'react'
+import { Calendar, Clock, MapPin, Radio } from 'lucide-react'
 import type { Jogo, Resultado } from '@/types'
 import { getFaseLabel, FASES_ORDER } from '@/lib/excel-parser'
 import { GRUPOS } from '@/lib/grupos'
@@ -26,6 +26,33 @@ function formatDateTime(iso: string | null): { date: string; time: string } | nu
 }
 
 export function CalendarView({ jogos, resultados }: { jogos: Jogo[]; resultados: Resultado[] }) {
+  const [liveScores, setLiveScores] = useState<Map<number, { gol_a: number; gol_b: number; minuto: number }>>(new Map())
+  const [liveGameNumeros, setLiveGameNumeros] = useState<Set<number>>(new Set())
+
+  useEffect(() => {
+    const poll = async () => {
+      try {
+        const res = await fetch('/api/live')
+        const data = await res.json()
+        if (data.live) {
+          const map = new Map<number, { gol_a: number; gol_b: number; minuto: number }>()
+          const set = new Set<number>()
+          for (const g of data.live) {
+            set.add(g.jogo_numero)
+            map.set(g.jogo_numero, { gol_a: g.gol_a, gol_b: g.gol_b, minuto: g.minuto })
+          }
+          setLiveScores(map)
+          setLiveGameNumeros(set)
+        }
+      } catch {
+        // ignore polling errors
+      }
+    }
+    poll()
+    const interval = setInterval(poll, 10000)
+    return () => clearInterval(interval)
+  }, [])
+
   const resultadoMap = useMemo(
     () => new Map(resultados.map((r) => [r.jogo_numero, r])),
     [resultados]
@@ -180,6 +207,7 @@ export function CalendarView({ jogos, resultados }: { jogos: Jogo[]; resultados:
                         {dayGames.map((jogo) => {
                           const dt = formatDateTime(jogo.data_hora)
                           const resultado = resultadoMap.get(jogo.jogo_numero)
+                          const live = liveScores.get(jogo.jogo_numero)
                           return (
                             <GameCard
                               key={jogo.jogo_numero}
@@ -190,8 +218,9 @@ export function CalendarView({ jogos, resultados }: { jogos: Jogo[]; resultados:
                               pais_b={jogo.pais_b}
                               dt={dt}
                               estadio={jogo.estadio}
-                              resultado={resultado}
+                              resultado={live ? undefined : resultado}
                               isNext={jogo.jogo_numero === nextGameNum}
+                              liveScore={live ?? null}
                             />
                           )
                         })}
@@ -221,6 +250,7 @@ export function CalendarView({ jogos, resultados }: { jogos: Jogo[]; resultados:
               {resolvedGames.map((g) => {
                 const resultado = resultadoMap.get(g.jogo_numero)
                 const dt = g.db ? formatDateTime(g.db.data_hora) : null
+                const live = liveScores.get(g.jogo_numero)
                 return (
                   <GameCard
                     key={g.jogo_numero}
@@ -230,8 +260,9 @@ export function CalendarView({ jogos, resultados }: { jogos: Jogo[]; resultados:
                     pais_b={g.db?.pais_b ?? null}
                     dt={dt}
                     estadio={g.db?.estadio ?? null}
-                    resultado={resultado}
+                    resultado={live ? undefined : resultado}
                     placeholder={!g.db}
+                    liveScore={live ?? null}
                   />
                 )
               })}
@@ -254,6 +285,7 @@ function GameCard({
   resultado,
   placeholder,
   isNext,
+  liveScore,
 }: {
   jogo_numero: number
   fase: string
@@ -265,13 +297,17 @@ function GameCard({
   resultado: Resultado | undefined
   placeholder?: boolean
   isNext?: boolean
+  liveScore?: { gol_a: number; gol_b: number; minuto: number } | null
 }) {
+  const isLive = !!liveScore
+
   return (
     <div
       className={clsx(
         'bg-stone-900 border rounded-xl p-4 transition-all',
-        resultado ? 'border-emerald-500/20' : 'border-stone-800',
-        isNext && !resultado && 'border-amber-500/40 ring-1 ring-amber-500/20'
+        resultado && !isLive ? 'border-emerald-500/20' : 'border-stone-800',
+        isLive && 'border-red-500/40 ring-1 ring-red-500/20',
+        isNext && !resultado && !isLive && 'border-amber-500/40 ring-1 ring-amber-500/20'
       )}
     >
       <div className="flex items-center gap-2 mb-3 flex-wrap">
@@ -281,7 +317,13 @@ function GameCard({
         {grupo && (
           <span className="text-xs text-stone-600">Grupo {grupo}</span>
         )}
-        {isNext && !resultado && (
+        {isLive && (
+          <span className="flex items-center gap-1 text-[10px] font-bold text-red-400 bg-red-950/60 border border-red-800/50 px-1.5 py-0.5 rounded animate-pulse">
+            <Radio size={8} className="animate-ping" />
+            AO VIVO
+          </span>
+        )}
+        {isNext && !resultado && !isLive && (
           <span className="text-[10px] font-bold text-amber-400 bg-amber-950/60 border border-amber-800/50 px-1.5 py-0.5 rounded">
             PRÓXIMO
           </span>
@@ -301,7 +343,7 @@ function GameCard({
           </div>
 
           <div className="flex flex-col gap-1 text-xs text-stone-500">
-            {dt && (
+            {dt && !isLive && (
               <div className="flex items-center gap-1.5">
                 <Calendar size={10} />
                 <span>{dt.date}</span>
@@ -309,17 +351,23 @@ function GameCard({
                 <span>{dt.time}</span>
               </div>
             )}
-            {estadio && (
+            {estadio && !isLive && (
               <div className="flex items-center gap-1.5">
                 <MapPin size={10} />
                 <span className="truncate">{estadio}</span>
+              </div>
+            )}
+            {isLive && (
+              <div className="flex items-center gap-1.5 text-red-400">
+                <Radio size={10} />
+                <span>{liveScore!.minuto}&apos;</span>
               </div>
             )}
           </div>
         </div>
       )}
 
-      {resultado && (
+      {(resultado && !isLive) && (
         <div className="mt-3 pt-3 border-t border-stone-800 text-center">
           <span className="text-emerald-400 font-mono font-bold text-lg">
             {resultado.gol_a} × {resultado.gol_b}
@@ -329,6 +377,14 @@ function GameCard({
               (pên: {resultado.penalti_a} × {resultado.penalti_b})
             </span>
           )}
+        </div>
+      )}
+
+      {isLive && (
+        <div className="mt-3 pt-3 border-t border-red-800 text-center">
+          <span className="text-red-400 font-mono font-bold text-2xl animate-pulse">
+            {liveScore!.gol_a} × {liveScore!.gol_b}
+          </span>
         </div>
       )}
     </div>

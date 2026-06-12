@@ -5,11 +5,12 @@ import clsx from 'clsx'
 
 interface RankingTableProps {
   ranking: ParticipanteRanking[]
+  positionChanges?: Record<string, number>
 }
 
 const medalhas = ['🥇', '🥈', '🥉']
 
-export function RankingTable({ ranking }: RankingTableProps) {
+export function RankingTable({ ranking, positionChanges }: RankingTableProps) {
   if (ranking.length === 0) {
     return (
       <div className="text-center py-12 text-stone-500">
@@ -49,6 +50,14 @@ export function RankingTable({ ranking }: RankingTableProps) {
               >
                 <td className="py-3 pr-4 text-stone-500 font-mono font-bold w-8">
                   {medalhas[i] ?? <span className="text-stone-600">{i + 1}</span>}
+                  {positionChanges && positionChanges[p.nome] !== undefined && positionChanges[p.nome] !== 0 && (
+                    <span className={clsx(
+                      'text-[10px] ml-0.5',
+                      positionChanges[p.nome] < 0 ? 'text-green-400' : 'text-red-400'
+                    )}>
+                      {positionChanges[p.nome] < 0 ? '↑' : '↓'}
+                    </span>
+                  )}
                 </td>
                 <td className="py-3 pr-4">
                   <div>

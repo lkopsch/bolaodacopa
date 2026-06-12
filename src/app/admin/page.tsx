@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Upload, Save, Trash2, LogOut, CheckCircle, AlertCircle, Lock, Users, Calendar, RefreshCw, Pencil, X } from 'lucide-react'
+import { Upload, Save, Trash2, LogOut, CheckCircle, AlertCircle, Lock, Users, Calendar, RefreshCw, Pencil, X, Plus, Minus, Radio } from 'lucide-react'
 import type { Jogo, Resultado } from '@/types'
 import clsx from 'clsx'
 
@@ -36,6 +36,8 @@ export default function AdminPage() {
   const [editGameNum, setEditGameNum] = useState<number | null>(null)
   const [editForm, setEditForm] = useState({ grupo: '', data_hora: '', estadio: '' })
   const [savingGame, setSavingGame] = useState(false)
+  const [liveGames, setLiveGames] = useState<any[]>([])
+  const [endingLive, setEndingLive] = useState<number | null>(null)
 
   // Participantes tab state
   const [participantes, setParticipantes] = useState<string[]>([])
@@ -106,6 +108,21 @@ export default function AdminPage() {
     fetchJogos()
     fetchParticipantes()
   }, [authed, fetchJogos, fetchParticipantes])
+
+  // Live polling
+  useEffect(() => {
+    if (!authed) return
+    const poll = async () => {
+      try {
+        const res = await fetch('/api/live')
+        const data = await res.json()
+        if (data.live) setLiveGames(data.live)
+      } catch {}
+    }
+    poll()
+    const interval = setInterval(poll, 10000)
+    return () => clearInterval(interval)
+  }, [authed])
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault()
@@ -262,6 +279,32 @@ export default function AdminPage() {
     )
   }
 
+  // ─── Live scoring helpers ─────────────────────────────────────────────────────
+
+  const atualizarLive = useCallback(async (jogo_numero: number, gol_a: number, gol_b: number) => {
+    try {
+      await fetch('/api/live', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+        body: JSON.stringify({ jogo_numero, gol_a: Math.max(0, gol_a), gol_b: Math.max(0, gol_b) }),
+      })
+    } catch {}
+  }, [password])
+
+  const finalizarLive = useCallback(async (jogo_numero: number) => {
+    setEndingLive(jogo_numero)
+    try {
+      await fetch('/api/live', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+        body: JSON.stringify({ jogo_numero, action: 'end' }),
+      })
+      setLiveGames((prev) => prev.filter((g) => g.jogo_numero !== jogo_numero))
+      fetchJogos()
+    } catch {}
+    setEndingLive(null)
+  }, [password, fetchJogos])
+
   // ─── Admin layout ─────────────────────────────────────────────────────────────
 
   return (
@@ -383,6 +426,73 @@ export default function AdminPage() {
                 <span className="text-xs text-stone-600">
                   Aplica a lista manual de 12 grupos nos jogos da fase de grupos
                 </span>
+              </div>
+            )}
+
+            {liveGames.length > 0 && (
+              <div className="bg-stone-900 border border-red-800/50 rounded-xl p-5 space-y-4">
+                <h3 className="flex items-center gap-2 text-sm font-bold text-red-400">
+                  <Radio size={14} className="animate-ping" />
+                  AO VIVO ({liveGames.length})
+                </h3>
+                <div className="grid gap-3">
+                  {liveGames.map((g: any) => (
+                    <div key={g.jogo_numero} className="bg-stone-800/50 border border-stone-800 rounded-lg p-4 flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="text-xs text-stone-500 font-mono shrink-0">#{g.jogo_numero}</span>
+                        <span className="text-sm font-medium text-white truncate">{g.pais_a}</span>
+                        <span className="text-stone-600 text-xs">vs</span>
+                        <span className="text-sm font-medium text-white truncate">{g.pais_b}</span>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => atualizarLive(g.jogo_numero, g.gol_a - 1, g.gol_b)}
+                            className="p-1 rounded bg-stone-700 hover:bg-stone-600 text-stone-400 hover:text-white transition-all disabled:opacity-30"
+                            disabled={g.gol_a <= 0}
+                          >
+                            <Minus size={12} />
+                          </button>
+                          <span className="text-lg font-bold font-mono text-white w-6 text-center">{g.gol_a}</span>
+                          <button
+                            onClick={() => atualizarLive(g.jogo_numero, g.gol_a + 1, g.gol_b)}
+                            className="p-1 rounded bg-stone-700 hover:bg-stone-600 text-stone-400 hover:text-white transition-all"
+                          >
+                            <Plus size={12} />
+                          </button>
+                        </div>
+
+                        <span className="text-stone-600">×</span>
+
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => atualizarLive(g.jogo_numero, g.gol_a, g.gol_b - 1)}
+                            className="p-1 rounded bg-stone-700 hover:bg-stone-600 text-stone-400 hover:text-white transition-all disabled:opacity-30"
+                            disabled={g.gol_b <= 0}
+                          >
+                            <Minus size={12} />
+                          </button>
+                          <span className="text-lg font-bold font-mono text-white w-6 text-center">{g.gol_b}</span>
+                          <button
+                            onClick={() => atualizarLive(g.jogo_numero, g.gol_a, g.gol_b + 1)}
+                            className="p-1 rounded bg-stone-700 hover:bg-stone-600 text-stone-400 hover:text-white transition-all"
+                          >
+                            <Plus size={12} />
+                          </button>
+                        </div>
+
+                        <button
+                          onClick={() => finalizarLive(g.jogo_numero)}
+                          disabled={endingLive === g.jogo_numero}
+                          className="flex items-center gap-1 text-xs px-2 py-1 rounded bg-emerald-900/50 hover:bg-emerald-800/50 text-emerald-400 hover:text-emerald-300 border border-emerald-800/50 transition-all disabled:opacity-50"
+                        >
+                          {endingLive === g.jogo_numero ? '...' : 'Finalizar'}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
