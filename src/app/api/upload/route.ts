@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { parseExcelFile, parseJogosFromExcel } from '@/lib/excel-parser'
+import type { Palpite, Jogo } from '@/types'
 import { supabaseAdmin } from '@/lib/supabase'
-
-export const runtime = 'nodejs'
 
 export async function POST(request: NextRequest) {
   try {
@@ -11,28 +9,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
     }
 
-    const formData = await request.formData()
-    const file = formData.get('file') as File | null
-
-    if (!file) {
-      return NextResponse.json({ error: 'Nenhum arquivo enviado' }, { status: 400 })
+    const body = await request.json()
+    const { participante, palpites, jogos } = body as {
+      participante: string
+      palpites: Palpite[]
+      jogos: Omit<Jogo, 'id' | 'created_at'>[]
     }
 
-    const ext = file.name.split('.').pop()?.toLowerCase()
-    if (!['xlsx', 'xlsm', 'xls'].includes(ext ?? '')) {
-      return NextResponse.json({ error: 'Formato inválido. Use .xlsx, .xlsm ou .xls' }, { status: 400 })
+    if (!palpites?.length) {
+      return NextResponse.json({ error: 'Nenhum palpite encontrado' }, { status: 400 })
     }
 
-    const buffer = await file.arrayBuffer()
-    const { participante, palpites } = parseExcelFile(buffer)
-
-    if (palpites.length === 0) {
-      return NextResponse.json({ error: 'Nenhum palpite encontrado na planilha' }, { status: 400 })
-    }
-
-    // Replace only this participant's palpites (accumulate, not overwrite all)
     const nomeParticipante = palpites[0].nome_participante
 
+    // Replace only this participant's palpites (accumulate, not overwrite all)
     const { error: deleteError } = await supabaseAdmin
       .from('palpites')
       .delete()
@@ -44,18 +34,14 @@ export async function POST(request: NextRequest) {
     if (insertError) throw insertError
 
     // Seed jogos table on first upload (group stage only)
-    const { count } = await supabaseAdmin
-      .from('jogos')
-      .select('*', { count: 'exact', head: true })
+    if (jogos?.length > 0) {
+      const { count } = await supabaseAdmin
+        .from('jogos')
+        .select('*', { count: 'exact', head: true })
 
-    if ((count ?? 0) === 0) {
-      const jogos = parseJogosFromExcel(buffer)
-      if (jogos.length > 0) {
+      if ((count ?? 0) === 0) {
         const { error: jogosError } = await supabaseAdmin.from('jogos').insert(jogos)
-        if (jogosError) {
-          console.error('Erro ao semear jogos:', jogosError)
-          // Non-fatal: palpites were already saved
-        }
+        if (jogosError) console.error('Erro ao semear jogos:', jogosError)
       }
     }
 

@@ -162,13 +162,21 @@ export default function AdminPage() {
     setUploading(true)
     setUploadResult(null)
     setUploadError(null)
-    const formData = new FormData()
-    formData.append('file', file)
     try {
+      // Parse client-side so we only send JSON (~20KB) instead of the full .xlsm file
+      const buffer = await file.arrayBuffer()
+      const { parseExcelFile, parseJogosFromExcel } = await import('@/lib/excel-parser')
+      const { participante, palpites } = parseExcelFile(buffer)
+      const jogos = parseJogosFromExcel(buffer)
+
+      if (palpites.length === 0) {
+        throw new Error('Nenhum palpite encontrado na planilha')
+      }
+
       const res = await fetch('/api/upload', {
         method: 'POST',
-        headers: { 'x-admin-password': password },
-        body: formData,
+        headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+        body: JSON.stringify({ participante, palpites, jogos }),
       })
       const data = await res.json()
       if (!res.ok) {
