@@ -93,6 +93,9 @@ export function MatchCard({ palpite, resultado, showPoints = true, compact = fal
           )}
         </div>
       )}
+      <div className="mt-3 pt-3 border-t border-stone-800">
+        <p className="text-xs text-stone-500 mb-1.5 text-center">{palpite.nome_participante}</p>
+      </div>
     </div>
   )
 }
