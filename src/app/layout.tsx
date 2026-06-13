@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import './globals.css'
+import { SpeedInsights } from '@vercel/speed-insights/next'
 
 export const metadata: Metadata = {
   title: 'Bolão Copa do Mundo',
@@ -20,6 +21,7 @@ export default function RootLayout({
       </head>
       <body className="bg-[#0c0c0e] text-white min-h-screen" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
         {children}
+        <SpeedInsights />
       </body>
     </html>
   )
