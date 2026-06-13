@@ -20,6 +20,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [aoVivoIds, setAoVivoIds] = useState<number[]>([])
+  const [liveGames, setLiveGames] = useState<any[]>([])
 
   const [searchParticipante, setSearchParticipante] = useState('')
   const [faseFiltro, setFaseFiltro] = useState<string>('todas')
@@ -81,11 +82,13 @@ export default function Home() {
       try {
         const res = await fetch('/api/live')
         const data = await res.json()
+        setLiveGames(data.live ?? [])
         if (data.em_andamento > 0) {
           fetchData()
         }
       } catch {}
     }
+    checkLive()
     const interval = setInterval(checkLive, 15000)
     return () => clearInterval(interval)
   }, [fetchData])
@@ -217,10 +220,15 @@ export default function Home() {
                 <h2 className="text-lg font-bold mb-6 flex items-center gap-2">
                   <Trophy className="text-amber-400" size={20} />
                   Classificação Geral
-                  {aoVivoIds.length > 0 && (
-                    <span className="text-xs font-normal text-red-400 ml-2 flex items-center gap-1">
+                  {liveGames.length > 0 && (
+                    <span className="text-xs font-normal text-red-400 ml-2 flex items-center gap-2 flex-wrap">
                       <Radio size={10} className="animate-ping" />
-                      PREVIEW AO VIVO
+                      AO VIVO
+                      {liveGames.map((g) => (
+                        <span key={g.jogo_numero} className="font-mono bg-red-950/40 border border-red-800/50 px-2 py-0.5 rounded text-red-300 whitespace-nowrap">
+                          {g.pais_a} {g.gol_a}×{g.gol_b} {g.pais_b}
+                        </span>
+                      ))}
                     </span>
                   )}
                 </h2>
