@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
-import { Trophy, Search, ChevronDown, Calendar, Radio } from 'lucide-react'
+import { Trophy, Search, ChevronDown, Radio } from 'lucide-react'
 import type { Palpite, Resultado, ParticipanteRanking, Jogo } from '@/types'
 import { getFaseLabel, FASES_ORDER } from '@/lib/excel-parser'
 import { RankingTable } from '@/components/RankingTable'

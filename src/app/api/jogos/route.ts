@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase, supabaseAdmin } from '@/lib/supabase'
-import { getGrupoDoJogo } from '@/lib/grupos'
 
 export async function GET() {
   const { data, error } = await supabase
