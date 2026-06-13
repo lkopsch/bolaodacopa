@@ -48,17 +48,19 @@ export function RankingTable({ ranking, positionChanges }: RankingTableProps) {
                   i > 0 && 'hover:bg-stone-800/40'
                 )}
               >
-                <td className="py-3 pr-4 text-stone-500 font-mono font-bold w-8">
-                  {medalhas[i] ?? <span className="text-stone-600">{i + 1}</span>}
-                  {positionChanges && positionChanges[p.nome] !== undefined && positionChanges[p.nome] !== 0 && (
-                    <span className={clsx(
-                      'text-[10px] ml-0.5',
-                      positionChanges[p.nome] > 0 ? 'text-green-400' : 'text-red-400'
-                    )}>
-                      {positionChanges[p.nome] > 0 ? '↑' : '↓'}
-                      {Math.abs(positionChanges[p.nome])}
-                    </span>
-                  )}
+                <td className="py-3 pr-4 text-stone-500 font-mono font-bold whitespace-nowrap">
+                  <span className="inline-flex items-center gap-1">
+                    {medalhas[i] ?? <span className="text-stone-600">{i + 1}</span>}
+                    {positionChanges && positionChanges[p.nome] !== undefined && positionChanges[p.nome] !== 0 && (
+                      <span className={clsx(
+                        'text-[10px]',
+                        positionChanges[p.nome] > 0 ? 'text-green-400' : 'text-red-400'
+                      )}>
+                        {positionChanges[p.nome] > 0 ? '↑' : '↓'}
+                        {Math.abs(positionChanges[p.nome])}
+                      </span>
+                    )}
+                  </span>
                 </td>
                 <td className="py-3 pr-4">
                   <div>

@@ -3,39 +3,15 @@ import { supabase } from '@/lib/supabase'
 import { calcularPontos } from '@/types'
 import type { Palpite, Resultado, ParticipanteRanking } from '@/types'
 
-export async function GET() {
-  const [{ data: palpites, error: e1 }, { data: resultados, error: e2 }, { data: aoVivo }] = await Promise.all([
-    supabase.from('palpites').select('*').order('jogo_numero'),
-    supabase.from('resultados').select('*'),
-    supabase.from('jogos_ao_vivo').select('*'),
-  ])
-
-  if (e1 || e2) {
-    return NextResponse.json({ error: e1?.message ?? e2?.message }, { status: 500 })
-  }
-
-  // Merge: live scores override saved resultados
-  const resultadosMap = new Map<number, Resultado>(
-    (resultados ?? []).map((r: Resultado) => [r.jogo_numero, r])
-  )
-  for (const live of (aoVivo ?? [])) {
-    resultadosMap.set(live.jogo_numero, {
-      jogo_numero: live.jogo_numero,
-      gol_a: live.gol_a,
-      gol_b: live.gol_b,
-      penalti_a: null,
-      penalti_b: null,
-    } as Resultado)
-  }
-
-  const aoVivoSet = new Set<number>((aoVivo ?? []).map((l: any) => l.jogo_numero))
-
-  // Build ranking
+function buildRanking(
+  palpites: Palpite[],
+  resultadosMap: Map<number, Resultado>,
+): ParticipanteRanking[] {
   const rankingMap = new Map<string, ParticipanteRanking>()
 
-  for (const palpite of palpites ?? []) {
+  for (const palpite of palpites) {
     const resultado = resultadosMap.get(palpite.jogo_numero)
-    const pontos = resultado ? calcularPontos(palpite as Palpite, resultado) : 0
+    const pontos = resultado ? calcularPontos(palpite, resultado) : 0
 
     if (!rankingMap.has(palpite.nome_participante)) {
       rankingMap.set(palpite.nome_participante, {
@@ -59,14 +35,52 @@ export async function GET() {
     }
   }
 
-  const ranking = Array.from(rankingMap.values()).sort(
+  return Array.from(rankingMap.values()).sort(
     (a, b) => b.pontos_total - a.pontos_total
   )
+}
 
-  const resultadosMerged = (resultados ?? []).filter(
-    (r: Resultado) => !aoVivoSet.has(r.jogo_numero)
+export async function GET() {
+  const [{ data: palpites, error: e1 }, { data: resultados, error: e2 }, { data: aoVivo }] = await Promise.all([
+    supabase.from('palpites').select('*').order('jogo_numero'),
+    supabase.from('resultados').select('*'),
+    supabase.from('jogos_ao_vivo').select('*'),
+  ])
+
+  if (e1 || e2) {
+    return NextResponse.json({ error: e1?.message ?? e2?.message }, { status: 500 })
+  }
+
+  const palpitesArr = (palpites ?? []) as Palpite[]
+  const resultadosArr = (resultados ?? []) as Resultado[]
+  const aoVivoArr = (aoVivo ?? []) as any[]
+
+  const aoVivoSet = new Set<number>(aoVivoArr.map((l) => l.jogo_numero))
+
+  // Base ranking (sem live scores)
+  const baseResultadosMap = new Map<number, Resultado>(
+    resultadosArr.map((r) => [r.jogo_numero, r])
   )
-  for (const live of (aoVivo ?? [])) {
+  const rankingBase = buildRanking(palpitesArr, baseResultadosMap)
+
+  // Live ranking (merge live scores on top)
+  const liveResultadosMap = new Map(baseResultadosMap)
+  for (const live of aoVivoArr) {
+    liveResultadosMap.set(live.jogo_numero, {
+      jogo_numero: live.jogo_numero,
+      gol_a: live.gol_a,
+      gol_b: live.gol_b,
+      penalti_a: null,
+      penalti_b: null,
+    } as Resultado)
+  }
+  const rankingLive = buildRanking(palpitesArr, liveResultadosMap)
+
+  // Merge resultados for frontend display
+  const resultadosMerged = resultadosArr.filter(
+    (r) => !aoVivoSet.has(r.jogo_numero)
+  )
+  for (const live of aoVivoArr) {
     resultadosMerged.push({
       jogo_numero: live.jogo_numero,
       gol_a: live.gol_a,
@@ -77,9 +91,10 @@ export async function GET() {
   }
 
   return NextResponse.json({
-    palpites: palpites ?? [],
+    palpites: palpitesArr,
     resultados: resultadosMerged,
-    ranking,
+    ranking: rankingLive,
+    ranking_base: rankingBase,
     ao_vivo: Array.from(aoVivoSet),
   })
 }

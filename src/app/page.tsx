@@ -25,7 +25,8 @@ export default function Home() {
   const [faseFiltro, setFaseFiltro] = useState<string>('todas')
   const [participanteFiltro, setParticipanteFiltro] = useState<string>('todos')
   const [positionChanges, setPositionChanges] = useState<Record<string, number>>({})
-  const prevRankingRef = useRef<ParticipanteRanking[]>([])
+  const baseRankingRef = useRef<ParticipanteRanking[]>([])
+  const changesTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const fetchData = useCallback(async (isInitial = false) => {
     try {
@@ -34,25 +35,34 @@ export default function Home() {
         fetch('/api/jogos').then((r) => r.json()),
       ])
       if (palpitesRes.error) throw new Error(palpitesRes.error)
-      const oldRanking = isInitial ? [] : prevRankingRef.current
       setPalpites(palpitesRes.palpites)
       setResultados(palpitesRes.resultados)
       setJogos(jogosRes)
       setRanking(palpitesRes.ranking)
       setAoVivoIds(palpitesRes.ao_vivo ?? [])
-      prevRankingRef.current = palpitesRes.ranking
-      if (!isInitial && oldRanking.length > 0) {
+
+      const aoVivoAtual = palpitesRes.ao_vivo ?? []
+
+      if (isInitial) {
+        baseRankingRef.current = palpitesRes.ranking_base ?? palpitesRes.ranking
+      }
+
+      // Compare live ranking against the base (non-live) ranking
+      if (baseRankingRef.current.length > 0) {
         const changes: Record<string, number> = {}
-        const oldPos = new Map(oldRanking.map((r, i) => [r.nome, i]))
+        const basePos = new Map(baseRankingRef.current.map((r, i) => [r.nome, i]))
         for (let i = 0; i < palpitesRes.ranking.length; i++) {
           const nome = palpitesRes.ranking[i].nome
-          const oldIdx = oldPos.get(nome)
+          const oldIdx = basePos.get(nome)
           if (oldIdx !== undefined && oldIdx !== i) {
             changes[nome] = oldIdx - i
           }
         }
         setPositionChanges(changes)
-        setTimeout(() => setPositionChanges({}), 5000)
+        if (changesTimerRef.current) clearTimeout(changesTimerRef.current)
+        if (Object.keys(changes).length > 0 && aoVivoAtual.length === 0) {
+          changesTimerRef.current = setTimeout(() => setPositionChanges({}), 5000)
+        }
       }
     } catch (e) {
       setError((e as Error).message)
