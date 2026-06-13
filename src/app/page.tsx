@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
-import { Trophy, Search, ChevronDown, Calendar } from 'lucide-react'
+import { Trophy, Search, ChevronDown, Calendar, Radio } from 'lucide-react'
 import type { Palpite, Resultado, ParticipanteRanking, Jogo } from '@/types'
 import { getFaseLabel, FASES_ORDER } from '@/lib/excel-parser'
 import { RankingTable } from '@/components/RankingTable'
@@ -19,6 +19,7 @@ export default function Home() {
   const [jogos, setJogos] = useState<Jogo[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [aoVivoIds, setAoVivoIds] = useState<number[]>([])
 
   const [searchParticipante, setSearchParticipante] = useState('')
   const [faseFiltro, setFaseFiltro] = useState<string>('todas')
@@ -38,6 +39,7 @@ export default function Home() {
       setResultados(palpitesRes.resultados)
       setJogos(jogosRes)
       setRanking(palpitesRes.ranking)
+      setAoVivoIds(palpitesRes.ao_vivo ?? [])
       prevRankingRef.current = palpitesRes.ranking
       if (!isInitial && oldRanking.length > 0) {
         const changes: Record<string, number> = {}
@@ -142,6 +144,15 @@ export default function Home() {
               </p>
             </div>
             <div className="flex gap-3 text-center">
+              {aoVivoIds.length > 0 && (
+                <div className="bg-red-950/60 border border-red-800 rounded-xl px-4 py-2">
+                  <p className="text-2xl font-black text-red-400 font-mono flex items-center justify-center gap-1">
+                    <Radio size={14} className="animate-ping" />
+                    {aoVivoIds.length}
+                  </p>
+                  <p className="text-xs text-red-400/80">AO VIVO</p>
+                </div>
+              )}
               <div className="bg-stone-900/60 border border-stone-800 rounded-xl px-4 py-2">
                 <p className="text-2xl font-black text-emerald-400 font-mono">{jogosConcluidos}</p>
                 <p className="text-xs text-stone-500">com resultado</p>
@@ -196,6 +207,12 @@ export default function Home() {
                 <h2 className="text-lg font-bold mb-6 flex items-center gap-2">
                   <Trophy className="text-amber-400" size={20} />
                   Classificação Geral
+                  {aoVivoIds.length > 0 && (
+                    <span className="text-xs font-normal text-red-400 ml-2 flex items-center gap-1">
+                      <Radio size={10} className="animate-ping" />
+                      PREVIEW AO VIVO
+                    </span>
+                  )}
                 </h2>
                 <RankingTable ranking={ranking} positionChanges={positionChanges} />
               </div>

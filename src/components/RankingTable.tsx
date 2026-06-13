@@ -53,9 +53,10 @@ export function RankingTable({ ranking, positionChanges }: RankingTableProps) {
                   {positionChanges && positionChanges[p.nome] !== undefined && positionChanges[p.nome] !== 0 && (
                     <span className={clsx(
                       'text-[10px] ml-0.5',
-                      positionChanges[p.nome] < 0 ? 'text-green-400' : 'text-red-400'
+                      positionChanges[p.nome] > 0 ? 'text-green-400' : 'text-red-400'
                     )}>
-                      {positionChanges[p.nome] < 0 ? '↑' : '↓'}
+                      {positionChanges[p.nome] > 0 ? '↑' : '↓'}
+                      {Math.abs(positionChanges[p.nome])}
                     </span>
                   )}
                 </td>

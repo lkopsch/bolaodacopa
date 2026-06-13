@@ -6,7 +6,7 @@ import type { Jogo } from '@/types'
 export async function GET() {
   const agora = new Date()
 
-  // Busca jogos que deveriam estar ocorrendo agora (data_hora <= agora < data_hora + 2h30)
+  // Busca jogos já iniciados (data_hora <= agora)
   const { data: jogos, error: jogosError } = await supabase
     .from('jogos')
     .select('*')
@@ -16,8 +16,6 @@ export async function GET() {
   if (jogosError) {
     return NextResponse.json({ error: jogosError.message }, { status: 500 })
   }
-
-  const limite = new Date(agora.getTime() - 150 * 60 * 1000) // 2h30 atrás
 
   // Tenta ler da tabela ao_vivo
   let aoVivoMap = new Map<number, { gol_a: number; gol_b: number; minuto: number }>()
@@ -32,18 +30,19 @@ export async function GET() {
     // tabela pode não existir ainda
   }
 
-  // Busca resultados existentes
-  const { data: resultados } = await supabase.from('resultados').select('*')
-  const resultadosMap = new Map((resultados ?? []).map((r: any) => [r.jogo_numero, r]))
+  // Janela de 3h para considerar um jogo como "ao vivo"
+  const limite = new Date(agora.getTime() - 180 * 60 * 1000)
 
-  const liveGames = (jogos as Jogo[] ?? []).filter((j) => {
-    if (!j.data_hora) return false
+  const liveGames: Jogo[] = []
+  for (const j of (jogos as Jogo[] ?? [])) {
+    if (!j.data_hora) continue
     const dt = new Date(j.data_hora)
-    return dt <= agora && dt >= limite && !resultadosMap.has(j.jogo_numero)
-  })
 
-  // Auto-start: cria entrada 0x0 na jogos_ao_vivo se não existir
-  for (const j of liveGames) {
+    // Fora da janela de 3h
+    if (dt < limite) continue
+    if (dt > agora) continue
+
+    // Auto-start: cria 0x0 se jogo está na janela e não tem entrada ao vivo
     if (!aoVivoMap.has(j.jogo_numero)) {
       try {
         await supabaseAdmin.from('jogos_ao_vivo').upsert(
@@ -54,6 +53,33 @@ export async function GET() {
       } catch {
         // tabela pode não existir
       }
+    }
+
+    liveGames.push(j)
+  }
+
+  // Auto-finalização: jogos com mais de 3h desde o início
+  const autoFinalizados: number[] = []
+  for (const [jogoNumero, live] of aoVivoMap) {
+    const jogo = (jogos as Jogo[] ?? []).find((j) => j.jogo_numero === jogoNumero)
+    if (!jogo?.data_hora) continue
+    const dt = new Date(jogo.data_hora)
+    const diffMs = agora.getTime() - dt.getTime()
+    if (diffMs > 3 * 60 * 60 * 1000) {
+      // Finaliza com o placar atual
+      await supabaseAdmin.from('resultados').upsert(
+        {
+          jogo_numero: jogoNumero,
+          gol_a: live.gol_a,
+          gol_b: live.gol_b,
+          penalti_a: null,
+          penalti_b: null,
+        },
+        { onConflict: 'jogo_numero' }
+      )
+      await supabaseAdmin.from('jogos_ao_vivo').delete().eq('jogo_numero', jogoNumero)
+      autoFinalizados.push(jogoNumero)
+      aoVivoMap.delete(jogoNumero)
     }
   }
 
@@ -75,7 +101,11 @@ export async function GET() {
     }
   })
 
-  return NextResponse.json({ live: result, em_andamento: result.length })
+  return NextResponse.json({
+    live: result,
+    em_andamento: result.length,
+    auto_finalizados: autoFinalizados,
+  })
 }
 
 // POST /api/live — admin: atualiza placar ou encerra partida
