@@ -30,12 +30,17 @@ export async function GET() {
     // tabela pode não existir ainda
   }
 
+  // Busca resultados existentes para não recriar jogos já finalizados
+  const { data: resultados } = await supabase.from('resultados').select('jogo_numero')
+  const resultadosSet = new Set((resultados ?? []).map((r: any) => r.jogo_numero))
+
   // Janela de 3h para considerar um jogo como "ao vivo"
   const limite = new Date(agora.getTime() - 180 * 60 * 1000)
 
   const liveGames: Jogo[] = []
   for (const j of (jogos as Jogo[] ?? [])) {
     if (!j.data_hora) continue
+    if (resultadosSet.has(j.jogo_numero)) continue // já finalizado, ignora
     const dt = new Date(j.data_hora)
 
     // Fora da janela de 3h
@@ -58,9 +63,15 @@ export async function GET() {
     liveGames.push(j)
   }
 
-  // Auto-finalização: jogos com mais de 3h desde o início
+  // Auto-finalização: jogos com mais de 3h desde o início (que não tenham resultado ainda)
   const autoFinalizados: number[] = []
   for (const [jogoNumero, live] of aoVivoMap) {
+    if (resultadosSet.has(jogoNumero)) {
+      // Já tem resultado, só limpa o live
+      await supabaseAdmin.from('jogos_ao_vivo').delete().eq('jogo_numero', jogoNumero)
+      aoVivoMap.delete(jogoNumero)
+      continue
+    }
     const jogo = (jogos as Jogo[] ?? []).find((j) => j.jogo_numero === jogoNumero)
     if (!jogo?.data_hora) continue
     const dt = new Date(jogo.data_hora)
