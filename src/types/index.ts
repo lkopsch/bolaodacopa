@@ -47,6 +47,7 @@ export interface ParticipanteRanking {
   jogos_palpitados: number
   acertos_placar: number
   acertos_resultado: number
+  acertos_um_lado: number
   erros: number
 }
 

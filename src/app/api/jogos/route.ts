@@ -28,6 +28,8 @@ export async function PATCH(request: NextRequest) {
   if (grupo !== undefined) updates.grupo = grupo || null
   if (data_hora !== undefined) updates.data_hora = data_hora || null
   if (estadio !== undefined) updates.estadio = estadio || null
+  if (body.pais_a !== undefined) updates.pais_a = body.pais_a || null
+  if (body.pais_b !== undefined) updates.pais_b = body.pais_b || null
 
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ error: 'Nenhum campo para atualizar' }, { status: 400 })

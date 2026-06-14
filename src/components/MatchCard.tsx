@@ -4,6 +4,7 @@ import clsx from 'clsx'
 import { calcularPontos } from '@/types'
 import type { Palpite, Resultado } from '@/types'
 import { getFaseLabel } from '@/lib/excel-parser'
+import { TeamWithFlag } from '@/lib/countryFlags'
 import { ScoreBadge } from './ScoreBadge'
 
 interface MatchCardProps {
@@ -42,7 +43,7 @@ export function MatchCard({ palpite, resultado, showPoints = true, compact = fal
       {/* Palpite Score */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex-1 text-right">
-          <p className="font-bold text-white text-sm leading-tight">{palpite.pais_a}</p>
+          <p className="font-bold text-white text-sm leading-tight"><TeamWithFlag name={palpite.pais_a} /></p>
         </div>
 
         <div className="flex items-center gap-1 shrink-0">
@@ -62,7 +63,7 @@ export function MatchCard({ palpite, resultado, showPoints = true, compact = fal
         </div>
 
         <div className="flex-1 text-left">
-          <p className="font-bold text-white text-sm leading-tight">{palpite.pais_b}</p>
+          <p className="font-bold text-white text-sm leading-tight"><TeamWithFlag name={palpite.pais_b} /></p>
         </div>
       </div>
 

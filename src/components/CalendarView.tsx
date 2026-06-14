@@ -1,10 +1,14 @@
 'use client'
 
 import { useMemo, useState, useEffect } from 'react'
-import { Calendar, Clock, MapPin, Radio } from 'lucide-react'
-import type { Jogo, Resultado } from '@/types'
+import { Calendar, Clock, MapPin, Radio, X, Eye } from 'lucide-react'
+import type { Jogo, Resultado, Palpite } from '@/types'
+import { calcularPontos } from '@/types'
+import { ScoreBadge } from './ScoreBadge'
+import { TeamWithFlag } from '@/lib/countryFlags'
 import { getFaseLabel, FASES_ORDER } from '@/lib/excel-parser'
 import { GRUPOS } from '@/lib/grupos'
+import { GrupoStanding, MelhoresTerceiros } from './GrupoStanding'
 import clsx from 'clsx'
 
 const PLAYOFF_GAMES: Record<string, number> = {
@@ -25,9 +29,10 @@ function formatDateTime(iso: string | null): { date: string; time: string } | nu
   }
 }
 
-export function CalendarView({ jogos, resultados }: { jogos: Jogo[]; resultados: Resultado[] }) {
+export function CalendarView({ jogos, resultados, palpites = [] }: { jogos: Jogo[]; resultados: Resultado[]; palpites?: Palpite[] }) {
   const [liveScores, setLiveScores] = useState<Map<number, { gol_a: number; gol_b: number; minuto: number }>>(new Map())
   const [liveGameNumeros, setLiveGameNumeros] = useState<Set<number>>(new Set())
+  const [selectedGame, setSelectedGame] = useState<number | null>(null)
 
   useEffect(() => {
     const poll = async () => {
@@ -142,11 +147,6 @@ export function CalendarView({ jogos, resultados }: { jogos: Jogo[]; resultados:
     return null
   }, [groupGamesSorted, resultadoMap])
 
-  const gruposList = useMemo(
-    () => Object.entries(GRUPOS).sort((a, b) => a[0].localeCompare(b[0])),
-    []
-  )
-
   return (
     <div className="space-y-8">
       <section>
@@ -154,26 +154,17 @@ export function CalendarView({ jogos, resultados }: { jogos: Jogo[]; resultados:
           <Calendar className="text-emerald-400" size={20} />
           Grupos da Copa
         </h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-          {gruposList.map(([letra, times]) => (
-            <div
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {Object.keys(GRUPOS).sort().map((letra) => (
+            <GrupoStanding
               key={letra}
-              className="bg-stone-800/50 border border-stone-700/50 rounded-xl p-4"
-            >
-              <span className="text-xs font-black text-emerald-400 bg-emerald-950/60 border border-emerald-800/50 px-2 py-0.5 rounded-lg inline-block mb-3">
-                GRUPO {letra}
-              </span>
-              <ul className="space-y-1.5">
-                {times.map((time) => (
-                  <li key={time} className="text-sm text-white font-medium flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/60 shrink-0" />
-                    {time}
-                  </li>
-                ))}
-              </ul>
-            </div>
+              grupo={letra}
+              jogos={jogos}
+              resultados={resultados}
+            />
           ))}
         </div>
+        <MelhoresTerceiros jogos={jogos} resultados={resultados} />
       </section>
 
       <div className="h-px bg-stone-800" />
@@ -204,7 +195,7 @@ export function CalendarView({ jogos, resultados }: { jogos: Jogo[]; resultados:
                         <div className="flex-1 h-px bg-stone-800" />
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {dayGames.map((jogo) => {
+                          {dayGames.map((jogo) => {
                           const dt = formatDateTime(jogo.data_hora)
                           const resultado = resultadoMap.get(jogo.jogo_numero)
                           const live = liveScores.get(jogo.jogo_numero)
@@ -221,6 +212,7 @@ export function CalendarView({ jogos, resultados }: { jogos: Jogo[]; resultados:
                               resultado={live ? undefined : resultado}
                               isNext={jogo.jogo_numero === nextGameNum}
                               liveScore={live ?? null}
+                              onShowPalpites={() => setSelectedGame(jogo.jogo_numero)}
                             />
                           )
                         })}
@@ -229,9 +221,84 @@ export function CalendarView({ jogos, resultados }: { jogos: Jogo[]; resultados:
                   ))}
                 </div>
               )}
+      {/* ── Palpites Modal ─────────────────────────────────────────────── */}
+      {selectedGame !== null && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+          onClick={() => setSelectedGame(null)}
+        >
+          <div
+            className={clsx(
+              'border rounded-2xl p-6 w-full max-w-2xl mx-4 shadow-2xl max-h-[80vh] flex flex-col',
+              liveScores.has(selectedGame) ? 'bg-stone-900 border-red-600/60 ring-1 ring-red-500/30' : 'bg-stone-900 border-stone-700'
+            )}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="font-bold text-white flex items-center gap-2 flex-wrap">
+                {(() => {
+                  const j = dbJogoMap.get(selectedGame)
+                  return j ? <>Jogo #{selectedGame} — <TeamWithFlag name={j.pais_a} /> × <TeamWithFlag name={j.pais_b} /></> : `Jogo #${selectedGame}`
+                })()}
+                {liveScores.has(selectedGame) && (
+                  <span className="flex items-center gap-1 text-[10px] font-bold text-red-400 bg-red-950/60 border border-red-800/50 px-1.5 py-0.5 rounded">
+                    <Radio size={8} className="animate-ping" />
+                    AO VIVO
+                  </span>
+                )}
+              </h3>
+              <button
+                onClick={() => setSelectedGame(null)}
+                className="p-1 rounded-lg text-stone-500 hover:text-white hover:bg-stone-800 transition-colors"
+              >
+                <X size={16} />
+              </button>
             </div>
-          )
-        }
+
+            <div className="overflow-y-auto flex-1">
+              {palpites.filter((p) => p.jogo_numero === selectedGame).length === 0 ? (
+                <p className="text-stone-500 text-sm text-center py-8">Nenhum palpite para este jogo.</p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {palpites
+                    .filter((p) => p.jogo_numero === selectedGame)
+                    .sort((a, b) => a.nome_participante.localeCompare(b.nome_participante))
+                    .map((p) => {
+                    const resultado = resultadoMap.get(p.jogo_numero)
+                    const pontos = resultado ? calcularPontos(p, resultado) : null
+                    return (
+                      <div
+                        key={p.nome_participante}
+                        className={clsx(
+                          'flex items-center justify-between rounded-xl px-4 py-3 gap-3',
+                          liveScores.has(selectedGame)
+                            ? 'bg-stone-800 border border-red-800/30'
+                            : 'bg-stone-800/50 border border-stone-700/50'
+                        )}
+                      >
+                        <span className="text-sm font-medium text-white truncate min-w-0">
+                          {p.nome_participante}
+                        </span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="font-mono font-bold text-white text-sm">
+                            {p.gol_a} × {p.gol_b}
+                          </span>
+                          {pontos !== null && (
+                            <ScoreBadge pontos={pontos} size="sm" />
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
         const resolvedGames = games.map((g) => ({
           ...g,
@@ -263,6 +330,7 @@ export function CalendarView({ jogos, resultados }: { jogos: Jogo[]; resultados:
                     resultado={live ? undefined : resultado}
                     placeholder={!g.db}
                     liveScore={live ?? null}
+                    onShowPalpites={g.db ? () => setSelectedGame(g.jogo_numero) : undefined}
                   />
                 )
               })}
@@ -286,6 +354,7 @@ function GameCard({
   placeholder,
   isNext,
   liveScore,
+  onShowPalpites,
 }: {
   jogo_numero: number
   fase: string
@@ -298,6 +367,7 @@ function GameCard({
   placeholder?: boolean
   isNext?: boolean
   liveScore?: { gol_a: number; gol_b: number; minuto: number } | null
+  onShowPalpites?: () => void
 }) {
   const isLive = !!liveScore
 
@@ -337,9 +407,9 @@ function GameCard({
       ) : (
         <div>
           <div className="flex items-center justify-between gap-2 mb-2">
-            <span className="font-semibold text-white text-sm truncate">{pais_a}</span>
+            <span className="font-semibold text-white text-sm truncate"><TeamWithFlag name={pais_a} /></span>
             <span className="text-stone-600 text-xs shrink-0">vs</span>
-            <span className="font-semibold text-white text-sm truncate">{pais_b}</span>
+            <span className="font-semibold text-white text-sm truncate"><TeamWithFlag name={pais_b} /></span>
           </div>
 
           <div className="flex flex-col gap-1 text-xs text-stone-500">
@@ -386,6 +456,16 @@ function GameCard({
             {liveScore!.gol_a} × {liveScore!.gol_b}
           </span>
         </div>
+      )}
+
+      {onShowPalpites && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onShowPalpites() }}
+          className="mt-2 w-full flex items-center justify-center gap-1 text-[11px] font-medium text-stone-500 hover:text-emerald-400 bg-stone-800/50 hover:bg-stone-800 py-1.5 rounded-lg transition-all"
+        >
+          <Eye size={11} />
+          Ver palpites
+        </button>
       )}
     </div>
   )

@@ -30,10 +30,11 @@ export function RankingTable({ ranking, positionChanges }: RankingTableProps) {
           <tr className="text-xs text-stone-500 uppercase tracking-wider">
             <th className="text-left pb-3 pr-4 font-medium">#</th>
             <th className="text-left pb-3 pr-4 font-medium">Participante</th>
-            <th className="text-right pb-3 pr-4 font-medium">Pontos</th>
-            <th className="text-right pb-3 pr-4 font-medium hidden sm:table-cell">⚽ Placar</th>
-            <th className="text-right pb-3 pr-4 font-medium hidden sm:table-cell">✓ Resultado</th>
-            <th className="text-right pb-3 font-medium hidden md:table-cell">Jogos</th>
+            <th className="text-right pb-3 pr-4 font-medium" title="Pontos totais">P</th>
+            <th className="text-right pb-3 pr-4 font-medium hidden sm:table-cell" title="Jogos palpitados">J</th>
+            <th className="text-right pb-3 pr-4 font-medium hidden sm:table-cell" title="Acertou um lado do placar (1pt)">xG</th>
+            <th className="text-right pb-3 pr-4 font-medium hidden sm:table-cell" title="Acertou o resultado (5-6pts)">R</th>
+            <th className="text-right pb-3 font-medium hidden md:table-cell" title="Resultado exato (10pts)">RE</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-stone-800/50">
@@ -45,10 +46,20 @@ export function RankingTable({ ranking, positionChanges }: RankingTableProps) {
                 className={clsx(
                   'group transition-colors',
                   i === 0 && 'bg-amber-500/5',
-                  i > 0 && 'hover:bg-stone-800/40'
+                  i > 0 && 'hover:bg-stone-800/40',
+                  positionChanges && positionChanges[p.nome] !== undefined && positionChanges[p.nome] > 0
+                    && 'bg-emerald-500/5',
+                  positionChanges && positionChanges[p.nome] !== undefined && positionChanges[p.nome] < 0
+                    && 'bg-red-500/5'
                 )}
               >
-                <td className="py-3 pr-4 text-stone-500 font-mono font-bold whitespace-nowrap">
+                <td className={clsx(
+                  'py-3 pr-4 text-stone-500 font-mono font-bold whitespace-nowrap',
+                  positionChanges && positionChanges[p.nome] !== undefined && positionChanges[p.nome] > 0
+                    && 'border-l-2 border-emerald-500 pl-2',
+                  positionChanges && positionChanges[p.nome] !== undefined && positionChanges[p.nome] < 0
+                    && 'border-l-2 border-red-500 pl-2'
+                )}>
                   <span className="inline-flex items-center gap-1">
                     {medalhas[i] ?? <span className="text-stone-600">{i + 1}</span>}
                     {positionChanges && positionChanges[p.nome] !== undefined && positionChanges[p.nome] !== 0 && (
@@ -91,13 +102,16 @@ export function RankingTable({ ranking, positionChanges }: RankingTableProps) {
                   </span>
                 </td>
                 <td className="py-3 pr-4 text-right hidden sm:table-cell">
-                  <span className="text-amber-400 font-mono">{p.acertos_placar}</span>
+                  <span className="text-stone-400 font-mono">{p.jogos_palpitados}</span>
+                </td>
+                <td className="py-3 pr-4 text-right hidden sm:table-cell">
+                  <span className="text-sky-400 font-mono">{p.acertos_um_lado}</span>
                 </td>
                 <td className="py-3 pr-4 text-right hidden sm:table-cell">
                   <span className="text-emerald-400 font-mono">{p.acertos_resultado}</span>
                 </td>
                 <td className="py-3 text-right hidden md:table-cell">
-                  <span className="text-stone-400 font-mono">{p.jogos_palpitados}</span>
+                  <span className="text-amber-400 font-mono">{p.acertos_placar}</span>
                 </td>
               </tr>
             )
@@ -107,9 +121,9 @@ export function RankingTable({ ranking, positionChanges }: RankingTableProps) {
 
       {/* Legend */}
       <div className="mt-4 pt-4 border-t border-stone-800 flex gap-4 text-xs text-stone-500 flex-wrap">
-        <span><span className="text-amber-400">⚽ Placar</span> = placar exato (1+1+5+3 = 10pts)</span>
-        <span><span className="text-emerald-400">✓ Resultado</span> = acertou resultado (5pts + lados)</span>
-        <span><span className="text-sky-400">❶ Lado</span> = acertou um lado (1pt)</span>
+        <span><span className="text-amber-400">RE</span> = resultado exato (10pts)</span>
+        <span><span className="text-emerald-400">R</span> = acertou resultado (5-6pts)</span>
+        <span><span className="text-sky-400">xG</span> = acertou um lado (1pt)</span>
       </div>
     </div>
   )

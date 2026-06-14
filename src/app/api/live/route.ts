@@ -133,6 +133,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'jogo_numero é obrigatório' }, { status: 400 })
   }
 
+  if (action === 'cancel') {
+    // Remove do ao_vivo sem salvar resultado
+    await supabaseAdmin.from('jogos_ao_vivo').delete().eq('jogo_numero', jogo_numero)
+    return NextResponse.json({ message: `Jogo ${jogo_numero} cancelado!` })
+  }
+
   if (action === 'end') {
     // Finaliza: pega placar atual, salva em resultados, remove do ao_vivo
     const { data: liveAtual } = await supabaseAdmin

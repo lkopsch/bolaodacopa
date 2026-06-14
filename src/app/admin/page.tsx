@@ -3,9 +3,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Upload, Save, Trash2, LogOut, CheckCircle, AlertCircle, Lock, Users, Calendar, RefreshCw, Pencil, X, Plus, Minus, Radio } from 'lucide-react'
 import type { Jogo, Resultado } from '@/types'
+import { TeamWithFlag } from '@/lib/countryFlags'
 import clsx from 'clsx'
 
-type AdminTab = 'jogos' | 'participantes'
+type AdminTab = 'jogos' | 'participantes' | 'matamata'
 
 interface JogoComResultado extends Jogo {
   resultado?: Resultado
@@ -32,12 +33,12 @@ export default function AdminPage() {
   const [loadingJogos, setLoadingJogos] = useState(false)
   const [edits, setEdits] = useState<EditState>({})
   const [saving, setSaving] = useState<number | null>(null)
-  const [fixingGrupos, setFixingGrupos] = useState(false)
   const [editGameNum, setEditGameNum] = useState<number | null>(null)
   const [editForm, setEditForm] = useState({ grupo: '', data_hora: '', estadio: '' })
   const [savingGame, setSavingGame] = useState(false)
   const [liveGames, setLiveGames] = useState<any[]>([])
   const [endingLive, setEndingLive] = useState<number | null>(null)
+  const [cancellingLive, setCancellingLive] = useState<number | null>(null)
 
   // Participantes tab state
   const [participantes, setParticipantes] = useState<string[]>([])
@@ -47,6 +48,13 @@ export default function AdminPage() {
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [dragOver, setDragOver] = useState(false)
   const [deletingNome, setDeletingNome] = useState<string | null>(null)
+
+  // Mata-mata state
+  const [knockoutTimes, setKnockoutTimes] = useState<string[]>([])
+  const [rodada32Jogos, setRodada32Jogos] = useState<Jogo[]>([])
+  const [confrontosEdit, setConfrontosEdit] = useState<Record<number, { pais_a: string; pais_b: string }>>({})
+  const [savingConfrontos, setSavingConfrontos] = useState(false)
+  const [autoFillLoading, setAutoFillLoading] = useState(false)
 
   const showToast = (msg: string, ok: boolean) => {
     setToast({ msg, ok })
@@ -242,16 +250,139 @@ export default function AdminPage() {
   const gruposOrdenados = Object.keys(jogosByGrupo).sort((a, b) => a.localeCompare(b))
   const totalComResultado = jogos.filter((j) => j.resultado).length
 
+  // ─── Mata-mata helpers ────────────────────────────────────────────────────────
+
+  const loadKnockoutData = useCallback(async () => {
+    try {
+      const [knockoutRes, jogosRes] = await Promise.all([
+        fetch('/api/knockout'),
+        fetch('/api/jogos'),
+      ])
+      const knockoutData = await knockoutRes.json()
+      const todosJogos: Jogo[] = await jogosRes.json()
+
+      setKnockoutTimes(knockoutData.times ?? [])
+      const rd32 = todosJogos.filter((j) => j.fase === 'Rodada_32').sort((a, b) => a.jogo_numero - b.jogo_numero)
+
+      // Se não existem jogos Rodada_32 no DB, cria placeholders vazios (jogos 73-88)
+      if (rd32.length === 0) {
+        const maxNum = todosJogos.length > 0 ? Math.max(...todosJogos.map((j) => j.jogo_numero)) : 72
+        const placeholders: Jogo[] = []
+        for (let i = 0; i < 16; i++) {
+          placeholders.push({
+            jogo_numero: maxNum + 1 + i,
+            fase: 'Rodada_32',
+            grupo: null,
+            pais_a: '',
+            pais_b: '',
+            data_hora: null,
+            estadio: null,
+          })
+        }
+        setRodada32Jogos(placeholders)
+      } else {
+        setRodada32Jogos(rd32)
+      }
+
+      // Inicializa edits
+      const initEdits: Record<number, { pais_a: string; pais_b: string }> = {}
+      for (const j of rd32) {
+        initEdits[j.jogo_numero] = { pais_a: j.pais_a ?? '', pais_b: j.pais_b ?? '' }
+      }
+      if (rd32.length === 0) {
+        const maxNum = todosJogos.length > 0 ? Math.max(...todosJogos.map((j) => j.jogo_numero)) : 72
+        for (let i = 0; i < 16; i++) {
+          initEdits[maxNum + 1 + i] = { pais_a: '', pais_b: '' }
+        }
+      }
+      setConfrontosEdit(initEdits)
+    } catch {}
+  }, [])
+
+  const autoFillConfrontos = useCallback(async () => {
+    setAutoFillLoading(true)
+    try {
+      const res = await fetch('/api/knockout')
+      const data = await res.json()
+      const sugestao = data.sugestao
+
+      // Monta 16 confrontos: intercala primeiros × segundos/melhores terceiros
+      const primeiros = sugestao.primeiros.map((p: any) => p.time)
+      const segundos = sugestao.segundos.map((p: any) => p.time)
+      const melhores3 = sugestao.melhoresTerceiros.map((p: any) => p.time)
+      const adversarios = [...segundos, ...melhores3] // 12 + 8 = 20, precisamos de 16
+
+      const newEdits: Record<number, { pais_a: string; pais_b: string }> = {}
+      const jogoNums = Object.keys(confrontosEdit).map(Number).sort((a, b) => a - b)
+
+      for (let i = 0; i < jogoNums.length && i < 16; i++) {
+        const a = primeiros[i] ?? ''
+        const b = adversarios[i] ?? ''
+        newEdits[jogoNums[i]] = { pais_a: a, pais_b: b }
+      }
+
+      setConfrontosEdit(newEdits)
+    } catch {}
+    setAutoFillLoading(false)
+  }, [confrontosEdit])
+
+  const saveConfrontos = useCallback(async () => {
+    setSavingConfrontos(true)
+    try {
+      const confrontos = Object.entries(confrontosEdit).map(([jogo_numero, c]) => ({
+        jogo_numero: Number(jogo_numero),
+        pais_a: c.pais_a || null,
+        pais_b: c.pais_b || null,
+      }))
+      const res = await fetch('/api/knockout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+        body: JSON.stringify({ confrontos }),
+      })
+      const data = await res.json()
+      showToast(data.message, res.ok)
+    } catch {
+      showToast('Erro ao salvar confrontos', false)
+    }
+    setSavingConfrontos(false)
+  }, [confrontosEdit, password])
+
+  useEffect(() => {
+    if (!authed || tab !== 'matamata') return
+    loadKnockoutData()
+  }, [authed, tab, loadKnockoutData])
+
   // ─── Live scoring helpers ─────────────────────────────────────────────────────
 
-  const atualizarLive = useCallback(async (jogo_numero: number, gol_a: number, gol_b: number) => {
+  const atualizarLive = useCallback((jogo_numero: number, gol_a: number, gol_b: number) => {
+    // Optimistic: atualiza a UI na hora
+    setLiveGames((prev) =>
+      prev.map((g) =>
+        g.jogo_numero === jogo_numero
+          ? { ...g, gol_a: Math.max(0, gol_a), gol_b: Math.max(0, gol_b) }
+          : g
+      )
+    )
+    // Sincroniza em background
+    fetch('/api/live', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+      body: JSON.stringify({ jogo_numero, gol_a: Math.max(0, gol_a), gol_b: Math.max(0, gol_b) }),
+    }).catch(() => {})
+  }, [password])
+
+  const cancelarLive = useCallback(async (jogo_numero: number) => {
+    if (!confirm(`Cancelar acompanhamento ao vivo do jogo ${jogo_numero}? O placar NÃO será salvo.`)) return
+    setCancellingLive(jogo_numero)
     try {
       await fetch('/api/live', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
-        body: JSON.stringify({ jogo_numero, gol_a: Math.max(0, gol_a), gol_b: Math.max(0, gol_b) }),
+        body: JSON.stringify({ jogo_numero, action: 'cancel' }),
       })
+      setLiveGames((prev) => prev.filter((g) => g.jogo_numero !== jogo_numero))
     } catch {}
+    setCancellingLive(null)
   }, [password])
 
   const finalizarLive = useCallback(async (jogo_numero: number) => {
@@ -272,14 +403,14 @@ export default function AdminPage() {
 
   if (!authed) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0c0c0e]">
-        <div className="w-full max-w-sm">
-          <div className="text-center mb-8">
+      <div className="min-h-dvh flex items-center justify-center bg-[#0c0c0e] p-4">
+        <div className="w-full max-w-sm mx-auto">
+          <div className="text-center mb-6">
             <div className="text-5xl mb-3">🔐</div>
             <h1 className="text-xl font-black text-white">Área Administrativa</h1>
             <p className="text-stone-500 text-sm mt-1">Bolão Copa do Mundo</p>
           </div>
-          <form onSubmit={handleLogin} className="bg-stone-900 border border-stone-800 rounded-2xl p-6 space-y-4">
+          <form onSubmit={handleLogin} className="bg-stone-900 border border-stone-800 rounded-2xl p-5 sm:p-6 space-y-4">
             <div>
               <label className="block text-sm text-stone-400 mb-2">Senha de Admin</label>
               <input
@@ -287,14 +418,14 @@ export default function AdminPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full bg-stone-800 border border-stone-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-emerald-500"
+                className="w-full bg-stone-800 border border-stone-700 rounded-lg px-4 py-3 text-white text-base focus:outline-none focus:border-emerald-500"
                 autoFocus
               />
               {authError && <p className="text-red-400 text-xs mt-1">{authError}</p>}
             </div>
             <button
               type="submit"
-              className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2"
+              className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2 text-base"
             >
               <Lock size={16} />
               Entrar
@@ -329,6 +460,8 @@ export default function AdminPage() {
             <a href="/" className="text-stone-500 hover:text-white text-sm transition-colors">← Voltar</a>
             <span className="text-stone-700">|</span>
             <h1 className="font-bold text-white">Admin</h1>
+            <span className="text-stone-700">·</span>
+            <a href="/live-control" className="text-red-400 hover:text-red-300 text-xs transition-colors">🎙 Live</a>
           </div>
           <button
             onClick={() => { setAuthed(false); setPassword('') }}
@@ -342,7 +475,7 @@ export default function AdminPage() {
 
       <div className="max-w-6xl mx-auto px-4 py-6">
         {/* Tabs */}
-        <div className="flex gap-1 bg-stone-900 border border-stone-800 rounded-xl p-1 mb-6 w-fit">
+        <div className="flex gap-1 bg-stone-900 border border-stone-800 rounded-xl p-1 mb-6 overflow-x-auto flex-nowrap">
           <button
             onClick={() => setTab('jogos')}
             className={clsx(
@@ -370,6 +503,16 @@ export default function AdminPage() {
                 {participantes.length}
               </span>
             )}
+          </button>
+          <button
+            onClick={() => setTab('matamata')}
+            className={clsx(
+              'flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all',
+              tab === 'matamata' ? 'bg-emerald-600 text-white' : 'text-stone-400 hover:text-white'
+            )}
+          >
+            ⚔️
+            Mata-mata
           </button>
         </div>
 
@@ -399,34 +542,7 @@ export default function AdminPage() {
             </div>
 
             {jogos.length > 0 && (
-              <div className="mb-6 flex items-center gap-3">
-                <button
-                  onClick={async () => {
-                    setFixingGrupos(true)
-                    try {
-                      const res = await fetch('/api/setup-grupos', {
-                        method: 'POST',
-                        headers: { 'x-admin-password': password },
-                      })
-                      const data = await res.json()
-                      showToast(data.message, res.ok)
-                      if (res.ok) await fetchJogos()
-                    } catch {
-                      showToast('Erro ao corrigir grupos', false)
-                    } finally {
-                      setFixingGrupos(false)
-                    }
-                  }}
-                  disabled={fixingGrupos}
-                  className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-stone-800 hover:bg-stone-700 text-stone-400 hover:text-white transition-all disabled:opacity-50"
-                >
-                  <RefreshCw size={12} className={fixingGrupos ? 'animate-spin' : ''} />
-                  {fixingGrupos ? 'Corrigindo...' : 'Corrigir grupos'}
-                </button>
-                <span className="text-xs text-stone-600">
-                  Aplica a lista manual de 12 grupos nos jogos da fase de grupos
-                </span>
-              </div>
+              <div className="mb-6" />
             )}
 
             {liveGames.length > 0 && (
@@ -440,9 +556,9 @@ export default function AdminPage() {
                     <div key={g.jogo_numero} className="bg-stone-800/50 border border-stone-800 rounded-lg p-4 flex items-center justify-between gap-4">
                       <div className="flex items-center gap-3 min-w-0">
                         <span className="text-xs text-stone-500 font-mono shrink-0">#{g.jogo_numero}</span>
-                        <span className="text-sm font-medium text-white truncate">{g.pais_a}</span>
+                        <span className="text-sm font-medium text-white truncate"><TeamWithFlag name={g.pais_a} /></span>
                         <span className="text-stone-600 text-xs">vs</span>
-                        <span className="text-sm font-medium text-white truncate">{g.pais_b}</span>
+                        <span className="text-sm font-medium text-white truncate"><TeamWithFlag name={g.pais_b} /></span>
                       </div>
 
                       <div className="flex items-center gap-3">
@@ -488,6 +604,13 @@ export default function AdminPage() {
                           className="flex items-center gap-1 text-xs px-2 py-1 rounded bg-emerald-900/50 hover:bg-emerald-800/50 text-emerald-400 hover:text-emerald-300 border border-emerald-800/50 transition-all disabled:opacity-50"
                         >
                           {endingLive === g.jogo_numero ? '...' : 'Finalizar'}
+                        </button>
+                        <button
+                          onClick={() => cancelarLive(g.jogo_numero)}
+                          disabled={cancellingLive === g.jogo_numero}
+                          className="flex items-center gap-1 text-xs px-2 py-1 rounded bg-red-900/50 hover:bg-red-800/50 text-red-400 hover:text-red-300 border border-red-800/50 transition-all disabled:opacity-50"
+                        >
+                          {cancellingLive === g.jogo_numero ? '...' : 'Cancelar'}
                         </button>
                       </div>
                     </div>
@@ -551,9 +674,9 @@ export default function AdminPage() {
 
                             {/* Teams */}
                             <div className="flex items-center gap-2 flex-1 min-w-0">
-                              <span className="font-semibold text-white text-sm truncate">{jogo.pais_a}</span>
+                              <span className="font-semibold text-white text-sm truncate"><TeamWithFlag name={jogo.pais_a} /></span>
                               <span className="text-stone-600 text-xs shrink-0">vs</span>
-                              <span className="font-semibold text-white text-sm truncate">{jogo.pais_b}</span>
+                              <span className="font-semibold text-white text-sm truncate"><TeamWithFlag name={jogo.pais_b} /></span>
                             </div>
 
                             {/* Date + Venue */}
@@ -742,6 +865,80 @@ export default function AdminPage() {
                   {savingGame ? 'Salvando...' : 'Salvar'}
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Mata-mata tab ─────────────────────────────────────────────────────── */}
+        {tab === 'matamata' && (
+          <div>
+            <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
+              <h2 className="text-lg font-bold text-white">Configurar Rodada de 32</h2>
+              <div className="flex gap-2">
+                <button
+                  onClick={autoFillConfrontos}
+                  disabled={autoFillLoading}
+                  className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-stone-800 hover:bg-stone-700 text-stone-400 hover:text-white transition-all disabled:opacity-50"
+                >
+                  <RefreshCw size={12} className={autoFillLoading ? 'animate-spin' : ''} />
+                  {autoFillLoading ? 'Gerando...' : 'Auto-preenchimento'}
+                </button>
+                <button
+                  onClick={saveConfrontos}
+                  disabled={savingConfrontos}
+                  className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition-all disabled:opacity-50"
+                >
+                  <Save size={12} />
+                  {savingConfrontos ? 'Salvando...' : 'Salvar todos'}
+                </button>
+              </div>
+            </div>
+
+            <p className="text-xs text-stone-500 mb-6">
+              Defina os confrontos da Rodada de 32. Use &quot;Auto-preenchimento&quot; para sugerir
+              (12 primeiros + 12 segundos + 8 melhores terceiros) ou selecione manualmente.
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {rodada32Jogos.map((jogo, idx) => {
+                const edit = confrontosEdit[jogo.jogo_numero] ?? { pais_a: '', pais_b: '' }
+                return (
+                  <div key={jogo.jogo_numero} className="bg-stone-900 border border-stone-800 rounded-xl p-4">
+                    <div className="text-xs font-mono text-stone-500 mb-2 text-center">
+                      #{jogo.jogo_numero} — Jogo {idx + 1}
+                    </div>
+                    <div className="space-y-2">
+                      <select
+                        value={edit.pais_a}
+                        onChange={(e) => setConfrontosEdit((prev) => ({
+                          ...prev,
+                          [jogo.jogo_numero]: { ...edit, pais_a: e.target.value },
+                        }))}
+                        className="w-full bg-stone-800 border border-stone-700 rounded-lg px-2 py-1.5 text-sm text-white focus:outline-none focus:border-emerald-500"
+                      >
+                        <option value="">Selecione...</option>
+                        {knockoutTimes.map((time) => (
+                          <option key={time} value={time}>{time}</option>
+                        ))}
+                      </select>
+                      <span className="block text-center text-xs text-stone-600">vs</span>
+                      <select
+                        value={edit.pais_b}
+                        onChange={(e) => setConfrontosEdit((prev) => ({
+                          ...prev,
+                          [jogo.jogo_numero]: { ...edit, pais_b: e.target.value },
+                        }))}
+                        className="w-full bg-stone-800 border border-stone-700 rounded-lg px-2 py-1.5 text-sm text-white focus:outline-none focus:border-emerald-500"
+                      >
+                        <option value="">Selecione...</option>
+                        {knockoutTimes.map((time) => (
+                          <option key={time} value={time}>{time}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           </div>
         )}

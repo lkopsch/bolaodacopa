@@ -7,9 +7,11 @@ import { getFaseLabel, FASES_ORDER } from '@/lib/excel-parser'
 import { RankingTable } from '@/components/RankingTable'
 import { MatchCard } from '@/components/MatchCard'
 import { CalendarView } from '@/components/CalendarView'
+import { KnockoutBracket } from '@/components/KnockoutBracket'
+import { TeamWithFlag } from '@/lib/countryFlags'
 import clsx from 'clsx'
 
-type Tab = 'ranking' | 'palpites' | 'jogos'
+type Tab = 'ranking' | 'palpites' | 'jogos' | 'mata-mata'
 
 export default function Home() {
   const [tab, setTab] = useState<Tab>('ranking')
@@ -185,7 +187,7 @@ export default function Home() {
 
       <div className="max-w-6xl mx-auto px-4 py-6">
         <div className="flex gap-1 bg-stone-900 border border-stone-800 rounded-xl p-1 mb-6 w-fit">
-          {(['ranking', 'palpites', 'jogos'] as Tab[]).map((t) => (
+          {(['ranking', 'palpites', 'jogos', 'mata-mata'] as Tab[]).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -194,7 +196,7 @@ export default function Home() {
                 tab === t ? 'bg-emerald-600 text-white shadow' : 'text-stone-400 hover:text-white'
               )}
             >
-              {t === 'ranking' ? '🏅 Ranking' : t === 'palpites' ? '📋 Palpites' : '🏆 A Copa'}
+              {t === 'ranking' ? '🏅 Ranking' : t === 'palpites' ? '📋 Palpites' : t === 'jogos' ? '🏆 A Copa' : '⚔️ Mata-mata'}
             </button>
           ))}
         </div>
@@ -226,7 +228,7 @@ export default function Home() {
                       AO VIVO
                       {liveGames.map((g) => (
                         <span key={g.jogo_numero} className="font-mono bg-red-950/40 border border-red-800/50 px-2 py-0.5 rounded text-red-300 whitespace-nowrap">
-                          {g.pais_a} {g.gol_a}×{g.gol_b} {g.pais_b}
+                          <TeamWithFlag name={g.pais_a} /> {g.gol_a}×{g.gol_b} <TeamWithFlag name={g.pais_b} />
                         </span>
                       ))}
                     </span>
@@ -238,7 +240,13 @@ export default function Home() {
 
             {tab === 'jogos' && (
               <div className="bg-stone-900 border border-stone-800 rounded-2xl p-6">
-                <CalendarView jogos={jogos} resultados={resultados} />
+                <CalendarView jogos={jogos} resultados={resultados} palpites={palpites} />
+              </div>
+            )}
+
+            {tab === 'mata-mata' && (
+              <div className="bg-stone-900 border border-stone-800 rounded-2xl p-6">
+                <KnockoutBracket jogos={jogos} resultados={resultados} />
               </div>
             )}
 

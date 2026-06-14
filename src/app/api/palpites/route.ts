@@ -20,6 +20,7 @@ function buildRanking(
         jogos_palpitados: 0,
         acertos_placar: 0,
         acertos_resultado: 0,
+        acertos_um_lado: 0,
         erros: 0,
       })
     }
@@ -31,6 +32,7 @@ function buildRanking(
       entry.pontos_total += pontos
       if (pontos === 10) entry.acertos_placar++
       else if (pontos >= 5) entry.acertos_resultado++
+      else if (pontos === 1) entry.acertos_um_lado++
       else entry.erros++
     }
   }
@@ -42,7 +44,7 @@ function buildRanking(
 
 export async function GET() {
   const [{ data: palpites, error: e1 }, { data: resultados, error: e2 }, { data: aoVivo }] = await Promise.all([
-    supabase.from('palpites').select('*').order('jogo_numero'),
+    supabase.from('palpites').select('*').order('jogo_numero').limit(1000000),
     supabase.from('resultados').select('*'),
     supabase.from('jogos_ao_vivo').select('*'),
   ])
