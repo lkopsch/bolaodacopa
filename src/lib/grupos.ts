@@ -5,7 +5,7 @@ export const GRUPOS: Record<string, string[]> = {
   B: ['Canadá', 'Bósnia', 'Catar', 'Suíça'],
   C: ['Brasil', 'Marrocos', 'Haiti', 'Escócia'],
   D: ['Estados Unidos', 'Paraguai', 'Austrália', 'Turquia'],
-  E: ['Alemanha', 'Curaçau', 'Costa do Marfim', 'Equador'],
+  E: ['Alemanha', 'Curaçao', 'Costa do Marfim', 'Equador'],
   F: ['Holanda', 'Japão', 'Suécia', 'Tunísia'],
   G: ['Bélgica', 'Egito', 'Irã', 'Nova Zelândia'],
   H: ['Espanha', 'Cabo Verde', 'Arábia Saudita', 'Uruguai'],
