@@ -56,9 +56,9 @@ export function RankingTable({ ranking, positionChanges }: RankingTableProps) {
                 <td className={clsx(
                   'py-3 pr-4 text-stone-500 font-mono font-bold whitespace-nowrap',
                   positionChanges && positionChanges[p.nome] !== undefined && positionChanges[p.nome] > 0
-                    && 'border-l-2 border-emerald-500 pl-2',
+                    && 'border-l-2 border-emerald-500 pl-4',
                   positionChanges && positionChanges[p.nome] !== undefined && positionChanges[p.nome] < 0
-                    && 'border-l-2 border-red-500 pl-2'
+                    && 'border-l-2 border-red-500 pl-4'
                 )}>
                   <span className="inline-flex items-center gap-1">
                     {medalhas[i] ?? <span className="text-stone-600">{i + 1}</span>}
@@ -110,7 +110,7 @@ export function RankingTable({ ranking, positionChanges }: RankingTableProps) {
                 <td className="py-3 pr-4 text-right hidden sm:table-cell">
                   <span className="text-emerald-400 font-mono">{p.acertos_resultado}</span>
                 </td>
-                <td className="py-3 text-right hidden md:table-cell">
+                <td className="py-3 pr-4 text-right hidden md:table-cell">
                   <span className="text-amber-400 font-mono">{p.acertos_placar}</span>
                 </td>
               </tr>

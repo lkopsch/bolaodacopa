@@ -30,6 +30,7 @@ export default function Home() {
   const [participanteFiltro, setParticipanteFiltro] = useState<string>('todos')
   const [positionChanges, setPositionChanges] = useState<Record<string, number>>({})
   const [innerPalpiteTab, setInnerPalpiteTab] = useState<'grupos' | 'matamata'>('grupos')
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const baseRankingRef = useRef<ParticipanteRanking[]>([])
   const changesTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -150,26 +151,26 @@ export default function Home() {
                 Acompanhe palpites e pontuação em tempo real
               </p>
             </div>
-            <div className="flex gap-3 text-center">
+            <div className="grid grid-cols-2 gap-2 w-full sm:flex sm:gap-3 sm:w-auto">
               {aoVivoIds.length > 0 && (
-                <div className="bg-red-950/60 border border-red-800 rounded-xl px-4 py-2">
-                  <p className="text-2xl font-black text-red-400 font-mono flex items-center justify-center gap-1">
-                    <Radio size={14} className="animate-ping" />
+                <div className="bg-red-950/60 border border-red-800 rounded-xl px-2 py-2 text-center sm:shrink-0">
+                  <p className="text-xl sm:text-2xl font-black text-red-400 font-mono flex items-center justify-center gap-1">
+                    <Radio size={12} className="animate-ping" />
                     {aoVivoIds.length}
                   </p>
                   <p className="text-xs text-red-400/80">AO VIVO</p>
                 </div>
               )}
-              <div className="bg-stone-900/60 border border-stone-800 rounded-xl px-4 py-2">
-                <p className="text-2xl font-black text-emerald-400 font-mono">{jogosConcluidos}</p>
+              <div className="bg-stone-900/60 border border-stone-800 rounded-xl px-2 py-2 text-center sm:shrink-0">
+                <p className="text-xl sm:text-2xl font-black text-emerald-400 font-mono">{jogosConcluidos}</p>
                 <p className="text-xs text-stone-500">com resultado</p>
               </div>
-              <div className="bg-stone-900/60 border border-stone-800 rounded-xl px-4 py-2">
-                <p className="text-2xl font-black text-white font-mono">{totalJogos}</p>
+              <div className="bg-stone-900/60 border border-stone-800 rounded-xl px-2 py-2 text-center sm:shrink-0">
+                <p className="text-xl sm:text-2xl font-black text-white font-mono">{totalJogos}</p>
                 <p className="text-xs text-stone-500">total jogos</p>
               </div>
-              <div className="bg-stone-900/60 border border-stone-800 rounded-xl px-4 py-2">
-                <p className="text-2xl font-black text-amber-400 font-mono">{participantes.length}</p>
+              <div className="bg-stone-900/60 border border-stone-800 rounded-xl px-2 py-2 text-center sm:shrink-0">
+                <p className="text-xl sm:text-2xl font-black text-amber-400 font-mono">{participantes.length}</p>
                 <p className="text-xs text-stone-500">participantes</p>
               </div>
             </div>
@@ -178,13 +179,14 @@ export default function Home() {
       </header>
 
       <div className="max-w-6xl mx-auto px-4 py-6">
-        <div className="flex gap-1 bg-stone-900 border border-stone-800 rounded-xl p-1 mb-6 w-fit">
+        {/* Desktop tabs */}
+        <div className="hidden sm:flex gap-1 bg-stone-900 border border-stone-800 rounded-xl p-1 mb-6 w-fit">
           {(['ranking', 'jogos', 'mata-mata', 'palpites'] as Tab[]).map((t) => {
             const blocked = t === 'mata-mata'
             return (
             <button
               key={t}
-              onClick={() => { if (!blocked) setTab(t) }}
+              onClick={() => { if (!blocked) setTab(t); setMobileMenuOpen(false) }}
               className={clsx(
                 'px-5 py-2 rounded-lg text-sm font-semibold transition-all',
                 tab === t && 'bg-emerald-600 text-white shadow',
@@ -196,6 +198,42 @@ export default function Home() {
             </button>
             )
           })}
+        </div>
+
+        {/* Mobile hamburger */}
+        <div className="sm:hidden mb-6">
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="flex items-center justify-between w-full bg-stone-900 border border-stone-800 rounded-xl px-4 py-3 text-sm font-semibold text-white"
+          >
+            <span>
+              {tab === 'ranking' ? '🏅 Classificação' : tab === 'jogos' ? '🏆 A Copa' : tab === 'mata-mata' ? '⚔️ Mata Mata' : '📋 Palpites'}
+            </span>
+            <svg className={`w-5 h-5 transition-transform ${mobileMenuOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          {mobileMenuOpen && (
+            <div className="mt-1 bg-stone-900 border border-stone-800 rounded-xl overflow-hidden">
+              {(['ranking', 'jogos', 'mata-mata', 'palpites'] as Tab[]).map((t) => {
+                const blocked = t === 'mata-mata'
+                return (
+                  <button
+                    key={t}
+                    onClick={() => { if (!blocked) { setTab(t); setMobileMenuOpen(false) } }}
+                    className={clsx(
+                      'w-full text-left px-4 py-3 text-sm font-semibold transition-all border-b border-stone-800 last:border-b-0',
+                      tab === t && 'bg-emerald-600/20 text-emerald-400',
+                      blocked && 'opacity-40 cursor-not-allowed',
+                      !blocked && tab !== t && 'text-stone-400 hover:text-white hover:bg-stone-800'
+                    )}
+                  >
+                    {t === 'ranking' ? '🏅 Classificação' : t === 'jogos' ? '🏆 A Copa' : t === 'mata-mata' ? '⚔️ Mata Mata' : '📋 Palpites'}
+                  </button>
+                )
+              })}
+            </div>
+          )}
         </div>
 
         {loading && (
