@@ -3,12 +3,23 @@
 import { useState, useEffect, useCallback } from 'react'
 import { LogOut, Lock, Radio, Plus, Minus, CheckCircle, AlertCircle, Trophy } from 'lucide-react'
 import { TeamWithFlag } from '@/lib/countryFlags'
+import { useAuth } from '@/contexts/AuthContext'
 import clsx from 'clsx'
 
 export default function LiveControlPage() {
+  const { user, logout: authLogout } = useAuth()
   const [password, setPassword] = useState('')
   const [authed, setAuthed] = useState(false)
   const [authError, setAuthError] = useState('')
+
+  useEffect(() => {
+    if (user?.is_admin) setAuthed(true)
+  }, [user])
+
+  function getAuthHeaders(): Record<string, string> {
+    return { 'x-admin-password': password }
+  }
+
   const [liveGames, setLiveGames] = useState<any[]>([])
   const [endingLive, setEndingLive] = useState<number | null>(null)
   const [cancellingLive, setCancellingLive] = useState<number | null>(null)
@@ -55,7 +66,7 @@ export default function LiveControlPage() {
     // Sincroniza em background
     fetch('/api/live', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
       body: JSON.stringify({ jogo_numero, gol_a: Math.max(0, gol_a), gol_b: Math.max(0, gol_b) }),
     }).catch(() => {})
   }, [password])
@@ -65,7 +76,7 @@ export default function LiveControlPage() {
     try {
       await fetch('/api/live', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({ jogo_numero, action: 'end' }),
       })
       setLiveGames((prev) => prev.filter((g) => g.jogo_numero !== jogo_numero))
@@ -82,7 +93,7 @@ export default function LiveControlPage() {
     try {
       await fetch('/api/live', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({ jogo_numero, action: 'cancel' }),
       })
       setLiveGames((prev) => prev.filter((g) => g.jogo_numero !== jogo_numero))
@@ -110,9 +121,12 @@ export default function LiveControlPage() {
               </p>
             )}
           </div>
+          {user && !user.is_admin && (
+            <p className="text-center text-amber-400 text-sm mb-4">Você não tem permissão de admin.</p>
+          )}
           <form onSubmit={handleLogin} className="bg-stone-900 border border-stone-800 rounded-2xl p-5 sm:p-6 space-y-4">
             <div>
-              <label className="block text-sm text-stone-400 mb-2">Senha de Admin</label>
+              <label className="block text-sm text-stone-400 mb-2">Senha Mestra</label>
               <input
                 type="password"
                 value={password}
@@ -170,8 +184,11 @@ export default function LiveControlPage() {
                 {liveGames.length} AO VIVO
               </span>
             )}
+            {user && (
+              <span className="text-xs text-stone-400 hidden sm:inline">{user.nickname}</span>
+            )}
             <button
-              onClick={() => { setAuthed(false); setPassword('') }}
+              onClick={() => { setAuthed(false); setPassword(''); authLogout() }}
               className="flex items-center gap-1.5 text-xs text-stone-500 hover:text-white transition-colors"
             >
               <LogOut size={14} />

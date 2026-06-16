@@ -4,14 +4,16 @@ import { verifyToken } from '@/lib/auth'
 
 export async function GET(req: NextRequest) {
   try {
-    const auth = req.headers.get('authorization')
-    if (!auth?.startsWith('Bearer ')) {
+    const cookieToken = req.cookies.get('token')?.value
+    if (!cookieToken) {
       return NextResponse.json({ user: null })
     }
 
-    const payload = verifyToken(auth.slice(7))
+    const payload = verifyToken(cookieToken)
     if (!payload || !payload.id) {
-      return NextResponse.json({ user: null })
+      const res = NextResponse.json({ user: null })
+      res.cookies.set('token', '', { httpOnly: true, path: '/', maxAge: 0 })
+      return res
     }
 
     const { data: user, error } = await supabaseAdmin
@@ -21,11 +23,15 @@ export async function GET(req: NextRequest) {
       .single()
 
     if (error || !user) {
-      return NextResponse.json({ user: null })
+      const res = NextResponse.json({ user: null })
+      res.cookies.set('token', '', { httpOnly: true, path: '/', maxAge: 0 })
+      return res
     }
 
     return NextResponse.json({ user })
   } catch {
-    return NextResponse.json({ user: null })
+    const res = NextResponse.json({ user: null })
+    res.cookies.set('token', '', { httpOnly: true, path: '/', maxAge: 0 })
+    return res
   }
 }

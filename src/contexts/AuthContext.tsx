@@ -12,41 +12,37 @@ interface User {
 
 interface AuthContextType {
   user: User | null
-  token: string | null
   loading: boolean
   login: (email: string, senha: string) => Promise<string | null>
   register: (email: string, nome_completo: string, nickname: string, senha: string) => Promise<string | null>
   logout: () => void
 }
 
-const TOKEN_KEY = 'bolao_token'
-
 const AuthContext = createContext<AuthContextType | null>(null)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
-  const [token, setToken] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    const stored = localStorage.getItem(TOKEN_KEY)
-    if (stored) {
-      fetch('/api/auth/me', { headers: { authorization: `Bearer ${stored}` } })
-        .then((r) => r.json())
-        .then((data) => {
-          if (data.user) {
-            setUser(data.user)
-            setToken(stored)
-          } else {
-            localStorage.removeItem(TOKEN_KEY)
-          }
-        })
-        .catch(() => localStorage.removeItem(TOKEN_KEY))
-        .finally(() => setLoading(false))
-    } else {
+  const fetchUser = useCallback(async () => {
+    try {
+      const res = await fetch('/api/auth/me')
+      const data = await res.json()
+      if (data.user) {
+        setUser(data.user)
+      } else {
+        setUser(null)
+      }
+    } catch {
+      setUser(null)
+    } finally {
       setLoading(false)
     }
   }, [])
+
+  useEffect(() => {
+    fetchUser()
+  }, [fetchUser])
 
   const login = useCallback(async (email: string, senha: string): Promise<string | null> => {
     const res = await fetch('/api/auth/login', {
@@ -56,9 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
     const data = await res.json()
     if (!res.ok) return data.error ?? 'Erro ao fazer login.'
-    localStorage.setItem(TOKEN_KEY, data.token)
     setUser(data.user)
-    setToken(data.token)
     return null
   }, [])
 
@@ -70,20 +64,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
     const data = await res.json()
     if (!res.ok) return data.error ?? 'Erro ao criar conta.'
-    localStorage.setItem(TOKEN_KEY, data.token)
     setUser(data.user)
-    setToken(data.token)
     return null
   }, [])
 
-  const logout = useCallback(() => {
-    localStorage.removeItem(TOKEN_KEY)
+  const logout = useCallback(async () => {
+    await fetch('/api/auth/logout', { method: 'POST' })
     setUser(null)
-    setToken(null)
   }, [])
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
       {children}
     </AuthContext.Provider>
   )

@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { supabase, supabaseAdmin } from '@/lib/supabase'
 import { GRUPOS } from '@/lib/grupos'
 import { isAdminRequest } from '@/lib/auth'
@@ -86,10 +86,11 @@ export async function GET() {
 }
 
 // POST /api/knockout — salva confrontos da Rodada_32
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   const authHeader = request.headers.get('x-admin-password')
   const bearer = request.headers.get('authorization')
-  if (!isAdminRequest(authHeader, bearer)) {
+  const cookieToken = request.cookies.get('token')?.value ?? null
+  if (!isAdminRequest(authHeader, bearer, cookieToken)) {
     return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
   }
 

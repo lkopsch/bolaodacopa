@@ -23,7 +23,7 @@ function formatDataHora(iso: string | null): string {
 }
 
 export default function AdminPage() {
-  const { user, token } = useAuth()
+  const { user, logout: authLogout } = useAuth()
   const [password, setPassword] = useState('')
   const [authed, setAuthed] = useState(false)
   const [authError, setAuthError] = useState('')
@@ -141,7 +141,7 @@ export default function AdminPage() {
   }, [authed])
 
   function getAuthHeaders(): Record<string, string> {
-    return token ? { authorization: `Bearer ${token}` } : { ...getAuthHeaders() }
+    return { 'x-admin-password': password }
   }
 
   const handleLogin = (e: React.FormEvent) => {
@@ -475,13 +475,18 @@ export default function AdminPage() {
             <span className="text-stone-700">·</span>
             <a href="/live-control" className="text-red-400 hover:text-red-300 text-xs transition-colors">🎙 Live</a>
           </div>
-          <button
-            onClick={() => { setAuthed(false); setPassword('') }}
-            className="flex items-center gap-1.5 text-xs text-stone-500 hover:text-white transition-colors"
-          >
-            <LogOut size={14} />
-            Sair
-          </button>
+          <div className="flex items-center gap-3">
+            {user && (
+              <span className="text-xs text-stone-400 hidden sm:inline">{user.nickname}</span>
+            )}
+            <button
+              onClick={() => { setAuthed(false); setPassword(''); authLogout() }}
+              className="flex items-center gap-1.5 text-xs text-stone-500 hover:text-white transition-colors"
+            >
+              <LogOut size={14} />
+              Sair
+            </button>
+          </div>
         </div>
       </header>
 

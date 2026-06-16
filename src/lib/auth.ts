@@ -22,20 +22,21 @@ export function verifyPassword(password: string, stored: string): boolean {
   return timingSafeEqual(Buffer.from(derived), Buffer.from(hash))
 }
 
-export function signToken(payload: Record<string, unknown>, expiresIn = '7d'): string {
+export function signToken(payload: Record<string, unknown>): string {
   const header = base64url(Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })))
-  const body = base64url(Buffer.from(JSON.stringify({ ...payload, exp: Date.now() + 7 * 86400000 })))
+  const body = base64url(Buffer.from(JSON.stringify(payload)))
   const signature = base64url(createHmac('sha256', JWT_SECRET).update(`${header}.${body}`).digest())
   return `${header}.${body}.${signature}`
 }
 
-export function isAdminRequest(adminPassword: string | null, bearerToken: string | null): boolean {
+export function isAdminRequest(adminPassword: string | null, bearerToken: string | null, cookieToken?: string | null): boolean {
   if (adminPassword && adminPassword === process.env.ADMIN_PASSWORD) return true
-  if (bearerToken?.startsWith('Bearer ')) {
-    const payload = verifyToken(bearerToken.slice(7))
+  const check = (t: string | null | undefined) => {
+    if (!t) return false
+    const payload = verifyToken(t)
     return payload?.is_admin === true
   }
-  return false
+  return check(bearerToken?.startsWith('Bearer ') ? bearerToken.slice(7) : null) || check(cookieToken)
 }
 
 export function verifyToken(token: string): Record<string, unknown> | null {
@@ -46,7 +47,6 @@ export function verifyToken(token: string): Record<string, unknown> | null {
     const expectedSig = base64url(createHmac('sha256', JWT_SECRET).update(`${header}.${body}`).digest())
     if (signature !== expectedSig) return null
     const payload = JSON.parse(fromBase64url(body).toString())
-    if (payload.exp && Date.now() > payload.exp) return null
     return payload
   } catch {
     return null

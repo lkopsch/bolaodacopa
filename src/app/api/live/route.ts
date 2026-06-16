@@ -124,7 +124,8 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   const authHeader = request.headers.get('x-admin-password')
   const bearer = request.headers.get('authorization')
-  if (!isAdminRequest(authHeader, bearer)) {
+  const cookieToken = request.cookies.get('token')?.value ?? null
+  if (!isAdminRequest(authHeader, bearer, cookieToken)) {
     return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
   }
 

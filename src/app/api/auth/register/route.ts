@@ -38,10 +38,19 @@ export async function POST(req: NextRequest) {
 
     const token = signToken({ id: user.id, email: user.email, is_admin: user.is_admin })
 
-    return NextResponse.json({
-      token,
+    const res = NextResponse.json({
       user: { id: user.id, email: user.email, nome_completo: user.nome_completo, nickname: user.nickname, is_admin: user.is_admin },
     })
+
+    res.cookies.set('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 31536000,
+    })
+
+    return res
   } catch (err) {
     return NextResponse.json({ error: 'Erro interno.' }, { status: 500 })
   }
