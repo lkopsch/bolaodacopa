@@ -58,13 +58,20 @@ export function getFlagClass(time: string | null | undefined): string {
   return `fi fi-${code}`
 }
 
-export function TeamWithFlag({ name, className = '' }: { name: string | null | undefined; className?: string }) {
+export function TeamWithFlag({ name, className = '', hideName = false }: { name: string | null | undefined; className?: string; hideName?: boolean }) {
   if (!name) return <span className="text-stone-600">─</span>
   const flagClass = getFlagClass(name)
   return (
     <span className={`inline-flex items-center gap-1.5 ${className}`}>
       {flagClass && <span className={`${flagClass} rounded-sm shrink-0`} style={{ width: 18, height: 12, verticalAlign: 'middle' }} />}
-      <span>{name}</span>
+      {!hideName && <span>{name}</span>}
     </span>
   )
+}
+
+export function FlagOnly({ name }: { name: string | null | undefined }) {
+  if (!name) return null
+  const flagClass = getFlagClass(name)
+  if (!flagClass) return null
+  return <span className={`${flagClass} rounded-sm shrink-0 inline-block`} style={{ width: 18, height: 12, verticalAlign: 'middle' }} />
 }

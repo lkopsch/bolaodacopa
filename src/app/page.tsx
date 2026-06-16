@@ -1,17 +1,18 @@
 'use client'
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
-import { Trophy, Search, ChevronDown, Radio } from 'lucide-react'
+import { Trophy, Radio } from 'lucide-react'
 import type { Palpite, Resultado, ParticipanteRanking, Jogo } from '@/types'
-import { getFaseLabel, FASES_ORDER } from '@/lib/excel-parser'
+import { FASES_ORDER } from '@/lib/excel-parser'
 import { RankingTable } from '@/components/RankingTable'
-import { MatchCard } from '@/components/MatchCard'
+import { PalpitesGrupos } from '@/components/PalpitesGrupos'
+import { PalpitesMataMata } from '@/components/PalpitesMataMata'
 import { CalendarView } from '@/components/CalendarView'
 import { KnockoutBracket } from '@/components/KnockoutBracket'
-import { TeamWithFlag } from '@/lib/countryFlags'
+import { TeamWithFlag, FlagOnly } from '@/lib/countryFlags'
 import clsx from 'clsx'
 
-type Tab = 'ranking' | 'palpites' | 'jogos' | 'mata-mata'
+type Tab = 'ranking' | 'jogos' | 'mata-mata' | 'palpites'
 
 export default function Home() {
   const [tab, setTab] = useState<Tab>('ranking')
@@ -28,6 +29,7 @@ export default function Home() {
   const [faseFiltro, setFaseFiltro] = useState<string>('todas')
   const [participanteFiltro, setParticipanteFiltro] = useState<string>('todos')
   const [positionChanges, setPositionChanges] = useState<Record<string, number>>({})
+  const [innerPalpiteTab, setInnerPalpiteTab] = useState<'grupos' | 'matamata'>('grupos')
   const baseRankingRef = useRef<ParticipanteRanking[]>([])
   const changesTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -95,21 +97,8 @@ export default function Home() {
     return () => clearInterval(interval)
   }, [fetchData])
 
-  const resultadoMap = useMemo(
-    () => new Map(resultados.map((r) => [r.jogo_numero, r])),
-    [resultados]
-  )
-
   const participantes = useMemo(
     () => [...new Set(palpites.map((p) => p.nome_participante))].sort(),
-    [palpites]
-  )
-
-  const fases = useMemo(
-    () =>
-      [...new Set(palpites.map((p) => p.fase))].sort(
-        (a, b) => (FASES_ORDER[a] ?? 99) - (FASES_ORDER[b] ?? 99)
-      ),
     [palpites]
   )
 
@@ -120,24 +109,27 @@ export default function Home() {
       if (searchParticipante) {
         const q = searchParticipante.toLowerCase()
         if (
+          !String(p.jogo_numero).includes(q) &&
           !p.nome_participante.toLowerCase().includes(q) &&
+          !p.fase.toLowerCase().includes(q) &&
           !p.pais_a.toLowerCase().includes(q) &&
           !p.pais_b.toLowerCase().includes(q)
-        )
-          return false
+        ) return false
       }
       return true
     })
   }, [palpites, participanteFiltro, faseFiltro, searchParticipante])
 
-  const palpitesByFase = useMemo(() => {
-    const grouped = new Map<string, Palpite[]>()
-    for (const p of palpitesFiltrados) {
-      if (!grouped.has(p.fase)) grouped.set(p.fase, [])
-      grouped.get(p.fase)!.push(p)
-    }
-    return grouped
-  }, [palpitesFiltrados])
+  const participantesFiltrados = useMemo(() => {
+    if (participanteFiltro !== 'todos') return [participanteFiltro]
+    const nomes = new Set(palpitesFiltrados.map((p) => p.nome_participante))
+    return [...nomes].sort()
+  }, [palpitesFiltrados, participanteFiltro])
+
+  const fasesDisponiveis = useMemo(() => {
+    const set = new Set(palpites.map((p) => p.fase))
+    return Array.from(set).sort((a, b) => (FASES_ORDER[a] ?? 99) - (FASES_ORDER[b] ?? 99))
+  }, [palpites])
 
   const jogosConcluidos = resultados.length
   const totalJogos = palpites.length > 0 ? Math.max(...palpites.map((p) => p.jogo_numero)) : 0
@@ -187,18 +179,23 @@ export default function Home() {
 
       <div className="max-w-6xl mx-auto px-4 py-6">
         <div className="flex gap-1 bg-stone-900 border border-stone-800 rounded-xl p-1 mb-6 w-fit">
-          {(['ranking', 'palpites', 'jogos', 'mata-mata'] as Tab[]).map((t) => (
+          {(['ranking', 'jogos', 'mata-mata', 'palpites'] as Tab[]).map((t) => {
+            const blocked = t === 'mata-mata'
+            return (
             <button
               key={t}
-              onClick={() => setTab(t)}
+              onClick={() => { if (!blocked) setTab(t) }}
               className={clsx(
                 'px-5 py-2 rounded-lg text-sm font-semibold transition-all',
-                tab === t ? 'bg-emerald-600 text-white shadow' : 'text-stone-400 hover:text-white'
+                tab === t && 'bg-emerald-600 text-white shadow',
+                blocked && 'opacity-40 cursor-not-allowed',
+                !blocked && tab !== t && 'text-stone-400 hover:text-white'
               )}
             >
-              {t === 'ranking' ? '🏅 Ranking' : t === 'palpites' ? '📋 Palpites' : t === 'jogos' ? '🏆 A Copa' : '⚔️ Mata-mata'}
+              {t === 'ranking' ? '🏅 Classificação' : t === 'jogos' ? '🏆 A Copa' : t === 'mata-mata' ? '⚔️ Mata Mata' : '📋 Palpites'}
             </button>
-          ))}
+            )
+          })}
         </div>
 
         {loading && (
@@ -227,8 +224,11 @@ export default function Home() {
                       <Radio size={10} className="animate-ping" />
                       AO VIVO
                       {liveGames.map((g) => (
-                        <span key={g.jogo_numero} className="font-mono bg-red-950/40 border border-red-800/50 px-2 py-0.5 rounded text-red-300 whitespace-nowrap">
-                          <TeamWithFlag name={g.pais_a} /> {g.gol_a}×{g.gol_b} <TeamWithFlag name={g.pais_b} />
+                        <span key={g.jogo_numero} className="font-mono bg-red-950/40 border border-red-800/50 px-2 py-0.5 rounded text-red-300 whitespace-nowrap inline-flex items-center gap-0.5 sm:gap-1">
+                          <span className="hidden sm:inline"><TeamWithFlag name={g.pais_a} /></span>
+                          <FlagOnly name={g.pais_a} />
+                          <span className="sm:ml-0">{g.gol_a}×{g.gol_b}</span>
+                          <FlagOnly name={g.pais_b} />
                         </span>
                       ))}
                     </span>
@@ -251,75 +251,76 @@ export default function Home() {
             )}
 
             {tab === 'palpites' && (
-              <div>
-                <div className="flex flex-wrap gap-3 mb-6">
-                  <div className="relative flex-1 min-w-48">
-                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500" />
+              <div className="bg-stone-900 border border-stone-800 rounded-2xl p-6 space-y-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="relative flex-1 min-w-[160px] max-w-xs">
+                    <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+                      <svg className="w-3.5 h-3.5 text-stone-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                    </div>
                     <input
                       type="text"
-                      placeholder="Buscar participante ou seleção..."
+                      placeholder="Pesquisar..."
                       value={searchParticipante}
                       onChange={(e) => setSearchParticipante(e.target.value)}
-                      className="w-full bg-stone-900 border border-stone-700 rounded-lg pl-9 pr-4 py-2 text-sm text-white placeholder-stone-500 focus:outline-none focus:border-emerald-500"
+                      className="w-full bg-stone-800 border border-stone-700 rounded-lg py-1.5 pl-9 pr-3 text-xs text-stone-200 placeholder-stone-500 outline-none focus:border-emerald-600 transition-colors"
                     />
                   </div>
-                  <div className="relative">
-                    <select
-                      value={participanteFiltro}
-                      onChange={(e) => setParticipanteFiltro(e.target.value)}
-                      className="appearance-none bg-stone-900 border border-stone-700 rounded-lg px-4 py-2 pr-8 text-sm text-white focus:outline-none focus:border-emerald-500"
-                    >
-                      <option value="todos">Todos participantes</option>
-                      {participantes.map((p) => (
-                        <option key={p} value={p}>{p}</option>
-                      ))}
-                    </select>
-                    <ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-500 pointer-events-none" />
-                  </div>
-                  <div className="relative">
+
+                  <select
+                    value={participanteFiltro}
+                    onChange={(e) => setParticipanteFiltro(e.target.value)}
+                    className="bg-stone-800 border border-stone-700 rounded-lg py-1.5 px-3 text-xs text-stone-200 outline-none focus:border-emerald-600 transition-colors"
+                  >
+                    <option value="todos">Participantes</option>
+                    {participantes.map((p) => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                  </select>
+
+                  {innerPalpiteTab === 'matamata' && (
                     <select
                       value={faseFiltro}
                       onChange={(e) => setFaseFiltro(e.target.value)}
-                      className="appearance-none bg-stone-900 border border-stone-700 rounded-lg px-4 py-2 pr-8 text-sm text-white focus:outline-none focus:border-emerald-500"
+                      className="bg-stone-800 border border-stone-700 rounded-lg py-1.5 px-3 text-xs text-stone-200 outline-none focus:border-emerald-600 transition-colors"
                     >
-                      <option value="todas">Todas as fases</option>
-                      {fases.map((f) => (
-                        <option key={f} value={f}>{getFaseLabel(f)}</option>
+                      <option value="todas">Fases</option>
+                      {fasesDisponiveis.map((f) => (
+                        <option key={f} value={f}>{f}</option>
                       ))}
                     </select>
-                    <ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-500 pointer-events-none" />
-                  </div>
-                  <span className="self-center text-xs text-stone-500">{palpitesFiltrados.length} palpite(s)</span>
+                  )}
                 </div>
 
-                {palpitesFiltrados.length === 0 ? (
-                  <div className="text-center py-16 text-stone-500">
-                    <p className="text-3xl mb-3">🔍</p>
-                    <p>Nenhum palpite encontrado com os filtros aplicados.</p>
-                  </div>
+                <div className="flex gap-1 bg-stone-800 border border-stone-700 rounded-lg p-0.5 w-fit">
+                  {(['grupos', 'matamata'] as const).map((t) => (
+                    <button
+                      key={t}
+                      onClick={() => { setInnerPalpiteTab(t); if (t === 'grupos') setFaseFiltro('todas') }}
+                      className={clsx(
+                        'px-4 py-1.5 rounded-md text-xs font-semibold transition-all',
+                        innerPalpiteTab === t ? 'bg-emerald-600 text-white shadow' : 'text-stone-400 hover:text-white'
+                      )}
+                    >
+                      {t === 'grupos' ? '🏟️ Grupos' : '⚔️ Mata-mata'}
+                    </button>
+                  ))}
+                </div>
+
+                {innerPalpiteTab === 'grupos' ? (
+                  <PalpitesGrupos
+                    palpites={palpitesFiltrados}
+                    resultados={resultados}
+                    jogos={jogos}
+                    participantes={participantesFiltrados}
+                  />
                 ) : (
-                  <div className="space-y-8">
-                    {Array.from(palpitesByFase.entries()).map(([fase, jogos]) => (
-                      <div key={fase}>
-                        <div className="flex items-center gap-3 mb-4">
-                          <h3 className="text-sm font-bold text-stone-300 uppercase tracking-wider">
-                            {getFaseLabel(fase)}
-                          </h3>
-                          <div className="flex-1 h-px bg-stone-800" />
-                          <span className="text-xs text-stone-600">{jogos.length} jogos</span>
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                          {jogos.map((p) => (
-                            <MatchCard
-                              key={`${p.nome_participante}-${p.jogo_numero}`}
-                              palpite={p}
-                              resultado={resultadoMap.get(p.jogo_numero)}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                  <PalpitesMataMata
+                    palpites={palpitesFiltrados}
+                    resultados={resultados}
+                    jogos={jogos}
+                  />
                 )}
               </div>
             )}

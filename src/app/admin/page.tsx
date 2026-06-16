@@ -542,11 +542,11 @@ export default function AdminPage() {
             </div>
 
             {jogos.length > 0 && (
-              <div className="mb-6" />
+              <div className="mb-4" />
             )}
 
             {liveGames.length > 0 && (
-              <div className="bg-stone-900 border border-red-800/50 rounded-xl p-5 space-y-4">
+              <div className="bg-stone-900 border border-red-800/50 rounded-xl p-5 space-y-4 mb-8">
                 <h3 className="flex items-center gap-2 text-sm font-bold text-red-400">
                   <Radio size={14} className="animate-ping" />
                   AO VIVO ({liveGames.length})
@@ -747,9 +747,13 @@ export default function AdminPage() {
                               <button
                                 onClick={() => {
                                   const dt = jogo.data_hora ? new Date(jogo.data_hora) : null
+                                  const pad = (n: number) => String(n).padStart(2, '0')
+                                  const dataHoraLocal = dt
+                                    ? `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`
+                                    : ''
                                   setEditForm({
                                     grupo: jogo.grupo ?? '',
-                                    data_hora: dt ? dt.toISOString().slice(0, 16) : '',
+                                    data_hora: dataHoraLocal,
                                     estadio: jogo.estadio ?? '',
                                   })
                                   setEditGameNum(jogo.jogo_numero)

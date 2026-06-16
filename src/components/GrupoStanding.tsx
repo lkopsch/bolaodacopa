@@ -3,6 +3,7 @@
 import type { Jogo, Resultado } from '@/types'
 import { GRUPOS } from '@/lib/grupos'
 import { TeamWithFlag } from '@/lib/countryFlags'
+import { Radio } from 'lucide-react'
 import clsx from 'clsx'
 
 interface TimeStanding {
@@ -68,10 +69,12 @@ export function GrupoStanding({
   grupo,
   jogos,
   resultados,
+  liveTimes,
 }: {
   grupo: string
   jogos: Jogo[]
   resultados: Resultado[]
+  liveTimes?: Set<string>
 }) {
   const tabela = calcularStandings(grupo, jogos, resultados)
 
@@ -104,7 +107,14 @@ export function GrupoStanding({
             ) : (
               tabela.map((t, i) => (
                 <tr key={t.time} className={clsx(i < 2 && 'bg-emerald-500/5')}>
-                  <td className="px-3 py-2 text-white font-medium truncate max-w-40"><TeamWithFlag name={t.time} /></td>
+                  <td className="px-3 py-2 text-white font-medium truncate max-w-40">
+                    <span className="inline-flex items-center gap-1">
+                      <TeamWithFlag name={t.time} />
+                      {liveTimes?.has(t.time) && (
+                        <Radio size={10} className="text-red-400 animate-ping shrink-0" />
+                      )}
+                    </span>
+                  </td>
                   <td className="text-center px-2 py-2 font-mono font-bold text-white">{t.pontos}</td>
                   <td className="text-center px-2 py-2 font-mono text-stone-400">{t.jogos}</td>
                   <td className="text-center px-2 py-2 font-mono text-stone-400">{t.gp}</td>
@@ -128,9 +138,11 @@ export function GrupoStanding({
 export function MelhoresTerceiros({
   jogos,
   resultados,
+  liveTimes,
 }: {
   jogos: Jogo[]
   resultados: Resultado[]
+  liveTimes?: Set<string>
 }) {
   const terceiros: TimeStanding[] = []
 
@@ -173,7 +185,14 @@ export function MelhoresTerceiros({
               return (
                 <tr key={t.time} className={clsx(i < 8 && 'bg-amber-500/5')}>
                   <td className="px-3 py-2 text-emerald-400 font-mono font-bold">{grupo}</td>
-                  <td className="px-3 py-2 text-white font-medium"><TeamWithFlag name={t.time} /></td>
+                  <td className="px-3 py-2 text-white font-medium">
+                    <span className="inline-flex items-center gap-1">
+                      <TeamWithFlag name={t.time} />
+                      {liveTimes?.has(t.time) && (
+                        <Radio size={10} className="text-red-400 animate-ping shrink-0" />
+                      )}
+                    </span>
+                  </td>
                   <td className="text-center px-2 py-2 font-mono font-bold text-white">{t.pontos}</td>
                   <td className="text-center px-2 py-2 font-mono text-stone-400">{t.jogos}</td>
                   <td className="text-center px-2 py-2 font-mono text-stone-400">{t.gp}</td>

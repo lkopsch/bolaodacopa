@@ -33,6 +33,7 @@ export function CalendarView({ jogos, resultados, palpites = [] }: { jogos: Jogo
   const [liveScores, setLiveScores] = useState<Map<number, { gol_a: number; gol_b: number; minuto: number }>>(new Map())
   const [liveGameNumeros, setLiveGameNumeros] = useState<Set<number>>(new Set())
   const [selectedGame, setSelectedGame] = useState<number | null>(null)
+  const [showAllFase, setShowAllFase] = useState(false)
 
   useEffect(() => {
     const poll = async () => {
@@ -147,6 +148,53 @@ export function CalendarView({ jogos, resultados, palpites = [] }: { jogos: Jogo
     return null
   }, [groupGamesSorted, resultadoMap])
 
+  const firstLiveOrNextIdx = useMemo(() => {
+    const now = new Date()
+    // Find first live game
+    for (let i = 0; i < groupGamesSorted.length; i++) {
+      if (liveGameNumeros.has(groupGamesSorted[i].jogo_numero)) return i
+    }
+    // No live games — find first upcoming game
+    for (let i = 0; i < groupGamesSorted.length; i++) {
+      const j = groupGamesSorted[i]
+      if (!j.data_hora) continue
+      if (new Date(j.data_hora) >= now && !resultadoMap.has(j.jogo_numero)) return i
+    }
+    return 0
+  }, [groupGamesSorted, liveGameNumeros, resultadoMap])
+
+  const filteredGamesByDate = useMemo(() => {
+    if (showAllFase) return gamesByDate
+
+    const cutoffIdx = firstLiveOrNextIdx
+
+    // Group-level filtering: keep only games at or after the cutoff,
+    // plus any live games before the cutoff
+    return gamesByDate
+      .map(([key, val]) => {
+        const activeGames = val.games.filter((g) => {
+          if (liveGameNumeros.has(g.jogo_numero)) return true
+          const idx = groupGamesSorted.findIndex((jg) => jg.jogo_numero === g.jogo_numero)
+          return idx >= cutoffIdx
+        })
+        return [key, { ...val, games: activeGames }] as [string, { label: string; games: Jogo[] }]
+      })
+      .filter(([, val]) => val.games.length > 0)
+  }, [gamesByDate, groupGamesSorted, firstLiveOrNextIdx, liveGameNumeros, showAllFase])
+
+  const totalFinished = groupGamesSorted.length - filteredGamesByDate.reduce((acc, [, v]) => acc + v.games.length, 0)
+
+  const liveTeams = useMemo(() => {
+    const teams = new Set<string>()
+    for (const j of jogos) {
+      if (liveGameNumeros.has(j.jogo_numero)) {
+        if (j.pais_a) teams.add(j.pais_a)
+        if (j.pais_b) teams.add(j.pais_b)
+      }
+    }
+    return teams
+  }, [jogos, liveGameNumeros])
+
   return (
     <div className="space-y-8">
       <section>
@@ -161,10 +209,11 @@ export function CalendarView({ jogos, resultados, palpites = [] }: { jogos: Jogo
               grupo={letra}
               jogos={jogos}
               resultados={resultados}
+              liveTimes={liveTeams}
             />
           ))}
         </div>
-        <MelhoresTerceiros jogos={jogos} resultados={resultados} />
+        <MelhoresTerceiros jogos={jogos} resultados={resultados} liveTimes={liveTeams} />
       </section>
 
       <div className="h-px bg-stone-800" />
@@ -186,7 +235,33 @@ export function CalendarView({ jogos, resultados, palpites = [] }: { jogos: Jogo
                 </div>
               ) : (
                 <div className="space-y-6">
-                  {gamesByDate.map(([, { label, games: dayGames }]) => (
+                  {showAllFase ? (
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs text-stone-500">
+                        Mostrando todos os {groupGamesSorted.length} jogos
+                      </p>
+                      <button
+                        onClick={() => setShowAllFase(false)}
+                        className="text-xs text-stone-500 hover:text-white transition-colors font-medium"
+                      >
+                        Ocultar encerrados
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs text-stone-500">
+                        Mostrando {filteredGamesByDate.reduce((acc, [, v]) => acc + v.games.length, 0)} jogos
+                        {totalFinished > 0 && ` (${totalFinished} antes)`}
+                      </p>
+                      <button
+                        onClick={() => setShowAllFase(true)}
+                        className="text-xs text-emerald-400 hover:text-emerald-300 transition-colors font-medium"
+                      >
+                        Mostrar todos
+                      </button>
+                    </div>
+                  )}
+                  {(showAllFase ? gamesByDate : filteredGamesByDate).map(([, { label, games: dayGames }]) => (
                     <div key={label}>
                       <div className="flex items-center gap-3 mb-3">
                         <span className="text-sm font-bold text-stone-300 uppercase tracking-wider">
@@ -429,8 +504,8 @@ function GameCard({
             )}
             {isLive && (
               <div className="flex items-center gap-1.5 text-red-400">
-                <Radio size={10} />
-                <span>{liveScore!.minuto}&apos;</span>
+                <Radio size={10} className="animate-pulse" />
+                <span>AO VIVO</span>
               </div>
             )}
           </div>
