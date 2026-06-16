@@ -10,6 +10,8 @@ import { PalpitesMataMata } from '@/components/PalpitesMataMata'
 import { CalendarView } from '@/components/CalendarView'
 import { KnockoutBracket } from '@/components/KnockoutBracket'
 import { TeamWithFlag, FlagOnly } from '@/lib/countryFlags'
+import { useAuth } from '@/contexts/AuthContext'
+import { AuthModal } from '@/components/AuthModal'
 import clsx from 'clsx'
 
 type Tab = 'ranking' | 'jogos' | 'mata-mata' | 'palpites'
@@ -31,6 +33,7 @@ export default function Home() {
   const [positionChanges, setPositionChanges] = useState<Record<string, number>>({})
   const [innerPalpiteTab, setInnerPalpiteTab] = useState<'grupos' | 'matamata'>('grupos')
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [authModalOpen, setAuthModalOpen] = useState(false)
   const baseRankingRef = useRef<ParticipanteRanking[]>([])
   const changesTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -132,6 +135,8 @@ export default function Home() {
     return Array.from(set).sort((a, b) => (FASES_ORDER[a] ?? 99) - (FASES_ORDER[b] ?? 99))
   }, [palpites])
 
+  const { user, logout } = useAuth()
+
   const jogosConcluidos = resultados.length
   const totalJogos = palpites.length > 0 ? Math.max(...palpites.map((p) => p.jogo_numero)) : 0
 
@@ -140,18 +145,25 @@ export default function Home() {
       <header className="grass-header border-b border-stone-800/50">
         <div className="max-w-6xl mx-auto px-4 py-8">
           <div className="flex items-center justify-between flex-wrap gap-4">
-            <div>
-              <div className="flex items-center gap-3 mb-1">
-                <span className="text-3xl">🏆</span>
-                <h1 className="text-2xl font-black tracking-tight text-white">
-                  Bolão Copa do Mundo
-                </h1>
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="text-3xl shrink-0">🏆</span>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+                  <h1 className="text-2xl font-black tracking-tight text-white">Bolão Copa do Mundo</h1>
+                  {user ? (
+                    <div className="flex items-center gap-1.5 sm:hidden">
+                      <span className="text-xs text-stone-400 truncate max-w-20">{user.nickname}</span>
+                      <button onClick={logout} className="text-xs text-stone-500 hover:text-red-400 transition-colors">sair</button>
+                    </div>
+                  ) : (
+                    <button onClick={() => setAuthModalOpen(true)} className="sm:hidden text-xs bg-emerald-600 text-white px-2 py-0.5 rounded-md font-semibold hover:bg-emerald-500 transition-colors">Entrar</button>
+                  )}
+                </div>
+                <p className="text-stone-400 text-sm">Acompanhe palpites e pontuação em tempo real</p>
               </div>
-              <p className="text-stone-400 text-sm ml-12">
-                Acompanhe palpites e pontuação em tempo real
-              </p>
             </div>
-            <div className="grid grid-cols-2 gap-2 w-full sm:flex sm:gap-3 sm:w-auto">
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              <div className="grid grid-cols-2 gap-2 flex-1 sm:flex sm:gap-3 sm:flex-1">
               {aoVivoIds.length > 0 && (
                 <div className="bg-red-950/60 border border-red-800 rounded-xl px-2 py-2 text-center sm:shrink-0">
                   <p className="text-xl sm:text-2xl font-black text-red-400 font-mono flex items-center justify-center gap-1">
@@ -173,6 +185,17 @@ export default function Home() {
                 <p className="text-xl sm:text-2xl font-black text-amber-400 font-mono">{participantes.length}</p>
                 <p className="text-xs text-stone-500">participantes</p>
               </div>
+            </div>
+              {user ? (
+                <div className="hidden sm:flex items-center gap-3 pl-4 border-l border-stone-700">
+                  <span className="text-sm text-stone-300">{user.nickname}</span>
+                  <button onClick={logout} className="text-xs text-stone-500 hover:text-red-400 transition-colors">sair</button>
+                </div>
+              ) : (
+                <div className="hidden sm:flex items-center pl-4 border-l border-stone-700">
+                  <button onClick={() => setAuthModalOpen(true)} className="text-xs bg-emerald-600 text-white px-3 py-1.5 rounded-lg font-semibold hover:bg-emerald-500 transition-colors">Entrar / Criar Conta</button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -366,10 +389,19 @@ export default function Home() {
         )}
       </div>
 
+      <AuthModal open={authModalOpen} onClose={() => setAuthModalOpen(false)} />
+
       <footer className="border-t border-stone-800 mt-16 py-6 text-center text-xs text-stone-600">
-        <a href="/admin" className="hover:text-stone-400 transition-colors">
-          Área Admin
-        </a>
+        {user?.is_admin && (
+          <a href="/admin" className="hover:text-stone-400 transition-colors mr-4">
+            Área Admin
+          </a>
+        )}
+        {!user?.is_admin && (
+          <a href="/admin" className="hover:text-stone-400 transition-colors">
+            Área Admin
+          </a>
+        )}
       </footer>
     </div>
   )

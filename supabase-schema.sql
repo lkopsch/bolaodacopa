@@ -71,8 +71,25 @@ ALTER TABLE jogos_ao_vivo ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Public read ao_vivo" ON jogos_ao_vivo FOR SELECT USING (true);
 CREATE POLICY "Service write ao_vivo" ON jogos_ao_vivo FOR ALL USING (auth.role() = 'service_role');
 
+-- Usuarios table: stores user accounts for the app
+CREATE TABLE IF NOT EXISTS usuarios (
+  id BIGSERIAL PRIMARY KEY,
+  email TEXT UNIQUE NOT NULL,
+  nome_completo TEXT NOT NULL,
+  nickname TEXT UNIQUE NOT NULL,
+  senha_hash TEXT NOT NULL,
+  is_admin BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE usuarios ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Public read usuarios" ON usuarios FOR SELECT USING (true);
+CREATE POLICY "Service write usuarios" ON usuarios FOR ALL USING (auth.role() = 'service_role');
+
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_palpites_jogo ON palpites(jogo_numero);
 CREATE INDEX IF NOT EXISTS idx_palpites_nome ON palpites(nome_participante);
 CREATE INDEX IF NOT EXISTS idx_resultados_jogo ON resultados(jogo_numero);
 CREATE INDEX IF NOT EXISTS idx_jogos_numero ON jogos(jogo_numero);
+CREATE INDEX IF NOT EXISTS idx_usuarios_email ON usuarios(email);
+CREATE INDEX IF NOT EXISTS idx_usuarios_nickname ON usuarios(nickname);

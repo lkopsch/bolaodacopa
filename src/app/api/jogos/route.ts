@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase, supabaseAdmin } from '@/lib/supabase'
+import { isAdminRequest } from '@/lib/auth'
 
 export async function GET() {
   const { data, error } = await supabase
@@ -13,7 +14,8 @@ export async function GET() {
 
 export async function PATCH(request: NextRequest) {
   const authHeader = request.headers.get('x-admin-password')
-  if (authHeader !== process.env.ADMIN_PASSWORD) {
+  const bearer = request.headers.get('authorization')
+  if (!isAdminRequest(authHeader, bearer)) {
     return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
   }
 

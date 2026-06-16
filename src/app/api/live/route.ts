@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase, supabaseAdmin } from '@/lib/supabase'
 import type { Jogo } from '@/types'
+import { isAdminRequest } from '@/lib/auth'
 
 // GET /api/live — retorna jogos ao vivo com placar atual
 export async function GET() {
@@ -122,7 +123,8 @@ export async function GET() {
 // POST /api/live — admin: atualiza placar ou encerra partida
 export async function POST(request: NextRequest) {
   const authHeader = request.headers.get('x-admin-password')
-  if (authHeader !== process.env.ADMIN_PASSWORD) {
+  const bearer = request.headers.get('authorization')
+  if (!isAdminRequest(authHeader, bearer)) {
     return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
   }
 

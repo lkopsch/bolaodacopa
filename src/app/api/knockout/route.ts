@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabase, supabaseAdmin } from '@/lib/supabase'
 import { GRUPOS } from '@/lib/grupos'
+import { isAdminRequest } from '@/lib/auth'
 import type { Jogo, Resultado } from '@/types'
 
 // GET /api/knockout — retorna todos os times disponíveis + classificação dos grupos
@@ -87,7 +88,8 @@ export async function GET() {
 // POST /api/knockout — salva confrontos da Rodada_32
 export async function POST(request: Request) {
   const authHeader = request.headers.get('x-admin-password')
-  if (authHeader !== process.env.ADMIN_PASSWORD) {
+  const bearer = request.headers.get('authorization')
+  if (!isAdminRequest(authHeader, bearer)) {
     return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
   }
 

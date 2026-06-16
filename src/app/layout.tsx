@@ -3,6 +3,7 @@ import './globals.css'
 import 'flag-icons/css/flag-icons.min.css'
 import { SpeedInsights } from '@vercel/speed-insights/next'
 import { Analytics } from '@vercel/analytics/react'
+import { AuthProvider } from '@/contexts/AuthContext'
 
 export const metadata: Metadata = {
   title: 'Bolão Copa do Mundo',
@@ -22,7 +23,9 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
       </head>
       <body className="bg-[#0c0c0e] text-white min-h-screen" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
-        {children}
+        <AuthProvider>
+          {children}
+        </AuthProvider>
         <SpeedInsights />
         <Analytics />
       </body>

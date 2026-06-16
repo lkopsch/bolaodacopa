@@ -51,6 +51,15 @@ export interface ParticipanteRanking {
   erros: number
 }
 
+export interface Usuario {
+  id: number
+  email: string
+  nome_completo: string
+  nickname: string
+  is_admin: boolean
+  created_at?: string
+}
+
 export interface ParsedSheet {
   participante: string
   palpites: Palpite[]

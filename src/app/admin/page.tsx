@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Upload, Save, Trash2, LogOut, CheckCircle, AlertCircle, Lock, Users, Calendar, RefreshCw, Pencil, X, Plus, Minus, Radio } from 'lucide-react'
 import type { Jogo, Resultado } from '@/types'
 import { TeamWithFlag } from '@/lib/countryFlags'
+import { useAuth } from '@/contexts/AuthContext'
 import clsx from 'clsx'
 
 type AdminTab = 'jogos' | 'participantes' | 'matamata'
@@ -22,10 +23,17 @@ function formatDataHora(iso: string | null): string {
 }
 
 export default function AdminPage() {
+  const { user, token } = useAuth()
   const [password, setPassword] = useState('')
   const [authed, setAuthed] = useState(false)
   const [authError, setAuthError] = useState('')
   const [tab, setTab] = useState<AdminTab>('jogos')
+
+  useEffect(() => {
+    if (user?.is_admin) {
+      setAuthed(true)
+    }
+  }, [user])
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null)
 
   // Jogos tab state
@@ -132,6 +140,10 @@ export default function AdminPage() {
     return () => clearInterval(interval)
   }, [authed])
 
+  function getAuthHeaders(): Record<string, string> {
+    return token ? { authorization: `Bearer ${token}` } : { ...getAuthHeaders() }
+  }
+
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault()
     if (!password) return
@@ -149,7 +161,7 @@ export default function AdminPage() {
     try {
       const res = await fetch('/api/results', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
           jogo_numero: jogoNumero,
           gol_a: Number(edit.gol_a),
@@ -177,7 +189,7 @@ export default function AdminPage() {
     try {
       const res = await fetch(`/api/results?jogo_numero=${jogoNumero}`, {
         method: 'DELETE',
-        headers: { 'x-admin-password': password },
+        headers: { ...getAuthHeaders() },
       })
       if (!res.ok) throw new Error('Erro ao remover')
       showToast(`Resultado do jogo ${jogoNumero} removido`, true)
@@ -204,7 +216,7 @@ export default function AdminPage() {
 
       const res = await fetch('/api/upload', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({ participante, palpites, jogos }),
       })
       const data = await res.json()
@@ -227,7 +239,7 @@ export default function AdminPage() {
     try {
       const res = await fetch(`/api/participantes?nome=${encodeURIComponent(nome)}`, {
         method: 'DELETE',
-        headers: { 'x-admin-password': password },
+        headers: { ...getAuthHeaders() },
       })
       if (!res.ok) throw new Error('Erro ao remover participante')
       showToast(`Palpites de ${nome} removidos`, true)
@@ -336,7 +348,7 @@ export default function AdminPage() {
       }))
       const res = await fetch('/api/knockout', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({ confrontos }),
       })
       const data = await res.json()
@@ -366,7 +378,7 @@ export default function AdminPage() {
     // Sincroniza em background
     fetch('/api/live', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
       body: JSON.stringify({ jogo_numero, gol_a: Math.max(0, gol_a), gol_b: Math.max(0, gol_b) }),
     }).catch(() => {})
   }, [password])
@@ -377,7 +389,7 @@ export default function AdminPage() {
     try {
       await fetch('/api/live', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({ jogo_numero, action: 'cancel' }),
       })
       setLiveGames((prev) => prev.filter((g) => g.jogo_numero !== jogo_numero))
@@ -390,7 +402,7 @@ export default function AdminPage() {
     try {
       await fetch('/api/live', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({ jogo_numero, action: 'end' }),
       })
       setLiveGames((prev) => prev.filter((g) => g.jogo_numero !== jogo_numero))
@@ -842,7 +854,7 @@ export default function AdminPage() {
                         : null
                       const res = await fetch('/api/jogos', {
                         method: 'PATCH',
-                        headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+                        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
                         body: JSON.stringify({
                           jogo_numero: editGameNum,
                           grupo: editForm.grupo || null,

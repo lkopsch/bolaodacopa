@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { GRUPOS, getGrupoDoJogo } from '@/lib/grupos'
+import { isAdminRequest } from '@/lib/auth'
 import type { Jogo } from '@/types'
 
 export async function POST(request: NextRequest) {
   const authHeader = request.headers.get('x-admin-password')
-  if (authHeader !== process.env.ADMIN_PASSWORD) {
+  const bearer = request.headers.get('authorization')
+  if (!isAdminRequest(authHeader, bearer)) {
     return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
   }
 
