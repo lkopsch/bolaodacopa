@@ -26,6 +26,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null)
   const [aoVivoIds, setAoVivoIds] = useState<number[]>([])
   const [liveGames, setLiveGames] = useState<any[]>([])
+  const [liveLoading, setLiveLoading] = useState(true)
 
   const [searchParticipante, setSearchParticipante] = useState('')
   const [faseFiltro, setFaseFiltro] = useState<string>('todas')
@@ -36,6 +37,7 @@ export default function Home() {
   const [authModalOpen, setAuthModalOpen] = useState(false)
   const baseRankingRef = useRef<ParticipanteRanking[]>([])
   const changesTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const liveIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const fetchData = useCallback(async (isInitial = false) => {
     try {
@@ -84,22 +86,30 @@ export default function Home() {
     fetchData(true)
   }, [fetchData])
 
-  // Live polling for ranking updates
+  // Live polling — 15s enquanto houver ao vivo, 2min em idle
   useEffect(() => {
     const checkLive = async () => {
       try {
         const res = await fetch('/api/live')
         const data = await res.json()
         setLiveGames(data.live ?? [])
-        if (data.em_andamento > 0) {
-          fetchData()
-        }
-      } catch {}
+        setLiveLoading(false)
+        if (data.em_andamento > 0) fetchData()
+      } catch {
+        setLiveLoading(false)
+      }
     }
+
+    const update = () => {
+      if (liveIntervalRef.current) clearInterval(liveIntervalRef.current)
+      const hasLive = aoVivoIds.length > 0
+      liveIntervalRef.current = setInterval(checkLive, hasLive ? 15000 : 120000)
+    }
+    update()
+
     checkLive()
-    const interval = setInterval(checkLive, 15000)
-    return () => clearInterval(interval)
-  }, [fetchData])
+    return () => { if (liveIntervalRef.current) clearInterval(liveIntervalRef.current) }
+  }, [fetchData, aoVivoIds.length])
 
   const participantes = useMemo(
     () => [...new Set(palpites.map((p) => p.nome_participante))].sort(),
@@ -259,6 +269,66 @@ export default function Home() {
           )}
         </div>
 
+        {/* Live Score Card */}
+        {aoVivoIds.length > 0 && (
+          <div className="mb-6 bg-gradient-to-r from-red-950/70 via-red-900/50 to-red-950/70 border border-red-800/60 rounded-2xl overflow-hidden">
+            <div className="px-5 py-3 border-b border-red-800/30 flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
+              <span className="text-red-400 font-bold text-sm uppercase tracking-wider">Ao Vivo</span>
+              <span className="text-red-400/60 text-xs ml-auto">
+                {liveLoading ? (
+                  <span className="inline-block w-4 h-4 border-2 border-red-400/30 border-t-red-400 rounded-full animate-spin" />
+                ) : (
+                  `${liveGames.length} jogo(s)`
+                )}
+              </span>
+            </div>
+            <div className="divide-y divide-red-800/20">
+              {aoVivoIds.map((id) => {
+                const live = liveGames.find((g) => g.jogo_numero === id)
+                const jogo = jogos.find((j) => j.jogo_numero === id)
+                if (!jogo) return null
+                return (
+                  <div key={id} className="px-5 py-4 flex items-center gap-3 sm:gap-6">
+                    <span className="text-[10px] font-mono text-red-400/50 bg-red-950/40 px-1.5 py-0.5 rounded shrink-0">
+                      #{id}
+                    </span>
+                    <div className="flex items-center justify-center gap-2 sm:gap-3 flex-1 min-w-0">
+                      <span className="text-sm font-semibold text-white truncate text-right min-w-0"><TeamWithFlag name={jogo.pais_a} /></span>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {live ? (
+                          <>
+                            <span className="text-xl sm:text-2xl font-black font-mono text-white tabular-nums">{live.gol_a}</span>
+                            <span className="text-stone-600 font-bold text-sm">×</span>
+                            <span className="text-xl sm:text-2xl font-black font-mono text-white tabular-nums">{live.gol_b}</span>
+                          </>
+                        ) : (
+                          <span className="text-stone-500 text-sm font-mono">? × ?</span>
+                        )}
+                      </div>
+                      <span className="text-sm font-semibold text-white truncate text-left min-w-0"><TeamWithFlag name={jogo.pais_b} /></span>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {live ? (
+                        <span className="text-[10px] font-bold text-red-400 bg-red-950/60 border border-red-800/50 px-1.5 py-0.5 rounded">
+                          {live.minuto}&apos;
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-stone-500 bg-stone-900/60 border border-stone-800/50 px-1.5 py-0.5 rounded">
+                          <span className="inline-block w-3 h-3 border-2 border-stone-600/30 border-t-stone-400 rounded-full animate-spin align-middle" />
+                        </span>
+                      )}
+                      {jogo.fase !== 'Grupos' && (
+                        <span className="text-[10px] text-stone-500 hidden sm:inline">{jogo.fase}</span>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
         {loading && (
           <div className="text-center py-20 text-stone-500">
             <div className="text-4xl mb-4 animate-bounce">⚽</div>
@@ -280,20 +350,6 @@ export default function Home() {
                 <h2 className="text-lg font-bold mb-6 flex items-center gap-2">
                   <Trophy className="text-amber-400" size={20} />
                   Classificação Geral
-                  {liveGames.length > 0 && (
-                    <span className="text-xs font-normal text-red-400 ml-2 flex items-center gap-2 flex-wrap">
-                      <Radio size={10} className="animate-ping" />
-                      AO VIVO
-                      {liveGames.map((g) => (
-                        <span key={g.jogo_numero} className="font-mono bg-red-950/40 border border-red-800/50 px-2 py-0.5 rounded text-red-300 whitespace-nowrap inline-flex items-center gap-0.5 sm:gap-1">
-                          <span className="hidden sm:inline"><TeamWithFlag name={g.pais_a} /></span>
-                          <FlagOnly name={g.pais_a} />
-                          <span className="sm:ml-0">{g.gol_a}×{g.gol_b}</span>
-                          <FlagOnly name={g.pais_b} />
-                        </span>
-                      ))}
-                    </span>
-                  )}
                 </h2>
                 <RankingTable ranking={ranking} positionChanges={positionChanges} />
               </div>
