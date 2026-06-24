@@ -2,24 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabase, supabaseAdmin } from '@/lib/supabase'
 import type { Jogo } from '@/types'
 import { isAdminRequest } from '@/lib/auth'
-import { syncLiveFromAPI } from '@/lib/api-live-sync'
-
-let lastSync = 0
-const SYNC_INTERVAL = 30_000
 
 // GET /api/live — retorna jogos ao vivo com placar atual
 export async function GET() {
-  // Sincroniza em background no máximo a cada 30s (não bloqueia a resposta)
-  const now = Date.now()
-  if (now - lastSync > SYNC_INTERVAL) {
-    lastSync = now
-    syncLiveFromAPI()
-      .then((r) => {
-        if (r.synced > 0 || r.finalized > 0) console.log(`[api-live-sync] ${r.synced} synced, ${r.finalized} finalized`)
-        if (r.errors.length > 0) console.warn('[api-live-sync] erros:', r.errors)
-      })
-      .catch(() => {})
-  }
 
   const agora = new Date()
 
