@@ -84,6 +84,8 @@ export function parseJogosFromExcel(buffer: ArrayBuffer): Omit<Jogo, 'id' | 'cre
         pais_b: String(paisB),
         data_hora: dateSerial && typeof dateSerial === 'number' ? excelSerialToISO(dateSerial) : null,
         estadio: local ? String(local) : null,
+        origem_a: null,
+        origem_b: null,
       })
     }
   } else if (palpitesSheetName) {
@@ -113,6 +115,8 @@ export function parseJogosFromExcel(buffer: ArrayBuffer): Omit<Jogo, 'id' | 'cre
           pais_b: String(paisB),
           data_hora: null,
           estadio: null,
+          origem_a: null,
+          origem_b: null,
         })
       }
     }

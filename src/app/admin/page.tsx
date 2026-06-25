@@ -15,6 +15,15 @@ interface JogoComResultado extends Jogo {
 
 type EditState = Record<number, { gol_a: string; gol_b: string; penalti_a: string; penalti_b: string }>
 
+const KNOCKOUT_ROUNDS = [
+  { fase: 'Rodada_32', label: 'Rodada de 32', start: 73, count: 16, type: 'team' as const },
+  { fase: 'Oitavas', label: 'Oitavas de Final', start: 89, count: 8, type: 'source' as const, sourceRange: [73, 88] as [number, number] },
+  { fase: 'Quartas', label: 'Quartas de Final', start: 97, count: 4, type: 'source' as const, sourceRange: [89, 96] as [number, number] },
+  { fase: 'Semi', label: 'Semifinais', start: 101, count: 2, type: 'source' as const, sourceRange: [97, 100] as [number, number] },
+  { fase: 'Disputa_Terceiro', label: 'Disputa de 3º Lugar', start: 103, count: 1, type: 'auto' as const },
+  { fase: 'Final', label: 'Final', start: 104, count: 1, type: 'auto' as const },
+]
+
 function formatDataHora(iso: string | null): string {
   if (!iso) return '—'
   const d = new Date(iso)
@@ -126,7 +135,8 @@ export default function AdminPage() {
   // Mata-mata state
   const [knockoutTimes, setKnockoutTimes] = useState<string[]>([])
   const [rodada32Jogos, setRodada32Jogos] = useState<Jogo[]>([])
-  const [confrontosEdit, setConfrontosEdit] = useState<Record<number, { pais_a: string; pais_b: string; data_hora: string; estadio: string }>>({})
+  type ConfrontoEdit = { pais_a: string; pais_b: string; data_hora: string; estadio: string; origem_a: string; origem_b: string }
+  const [confrontosEdit, setConfrontosEdit] = useState<Record<number, ConfrontoEdit>>({})
   const [savingConfrontos, setSavingConfrontos] = useState(false)
   const [autoFillLoading, setAutoFillLoading] = useState(false)
 
@@ -340,44 +350,57 @@ export default function AdminPage() {
       const todosJogos: Jogo[] = await jogosRes.json()
 
       setKnockoutTimes(knockoutData.times ?? [])
-      const rd32 = todosJogos.filter((j) => j.fase === 'Rodada_32').sort((a, b) => a.jogo_numero - b.jogo_numero)
 
-      // Se não existem jogos Rodada_32 no DB, cria placeholders vazios (jogos 73-88)
-      if (rd32.length === 0) {
-        const maxNum = todosJogos.length > 0 ? Math.max(...todosJogos.map((j) => j.jogo_numero)) : 72
-        const placeholders: Jogo[] = []
-        for (let i = 0; i < 16; i++) {
-          placeholders.push({
-            jogo_numero: maxNum + 1 + i,
-            fase: 'Rodada_32',
-            grupo: null,
-            pais_a: '',
-            pais_b: '',
-            data_hora: null,
-            estadio: null,
-          })
-        }
-        setRodada32Jogos(placeholders)
-      } else {
-        setRodada32Jogos(rd32)
+      // Carrega jogos de todas as fases do mata-mata
+      const allKnockoutGames: Jogo[] = todosJogos.filter((j) => j.fase !== 'Grupos')
+      const jogosPorFase = new Map<string, Jogo[]>()
+      for (const j of allKnockoutGames) {
+        if (!jogosPorFase.has(j.fase)) jogosPorFase.set(j.fase, [])
+        jogosPorFase.get(j.fase)!.push(j)
       }
 
+      // Gera placeholders para fases que ainda não existem no DB
+      const jogosCompletos: Jogo[] = []
+      for (const r of KNOCKOUT_ROUNDS) {
+        const existentes = jogosPorFase.get(r.fase) ?? []
+        if (existentes.length > 0) {
+          jogosCompletos.push(...existentes)
+        } else {
+          for (let i = 0; i < r.count; i++) {
+            jogosCompletos.push({
+              jogo_numero: r.start + i,
+              fase: r.fase,
+              grupo: null,
+              pais_a: '',
+              pais_b: '',
+              data_hora: null,
+              estadio: null,
+              origem_a: null,
+              origem_b: null,
+            })
+          }
+        }
+      }
+
+      setRodada32Jogos(jogosCompletos)
+
       // Inicializa edits
-      const initEdits: Record<number, { pais_a: string; pais_b: string; data_hora: string; estadio: string }> = {}
-      for (const j of rd32) {
+      const initEdits: Record<number, ConfrontoEdit> = {}
+      for (const j of jogosCompletos) {
         initEdits[j.jogo_numero] = {
           pais_a: j.pais_a ?? '',
           pais_b: j.pais_b ?? '',
           data_hora: toDatetimeLocal(j.data_hora),
           estadio: j.estadio ?? '',
+          origem_a: j.origem_a != null ? String(j.origem_a) : '',
+          origem_b: j.origem_b != null ? String(j.origem_b) : '',
         }
       }
-      if (rd32.length === 0) {
-        const maxNum = todosJogos.length > 0 ? Math.max(...todosJogos.map((j) => j.jogo_numero)) : 72
-        for (let i = 0; i < 16; i++) {
-          initEdits[maxNum + 1 + i] = { pais_a: '', pais_b: '', data_hora: '', estadio: '' }
-        }
-      }
+      // Games 103 e 104: sempre defaults
+      if (!initEdits[103]?.origem_a) initEdits[103].origem_a = '101'
+      if (!initEdits[103]?.origem_b) initEdits[103].origem_b = '102'
+      if (!initEdits[104]?.origem_a) initEdits[104].origem_a = '101'
+      if (!initEdits[104]?.origem_b) initEdits[104].origem_b = '102'
       setConfrontosEdit(initEdits)
     } catch {}
   }, [])
@@ -389,21 +412,63 @@ export default function AdminPage() {
       const data = await res.json()
       const sugestao = data.sugestao
 
-      // Monta 16 confrontos: intercala primeiros × segundos/melhores terceiros
       const primeiros = sugestao.primeiros.map((p: any) => p.time)
       const segundos = sugestao.segundos.map((p: any) => p.time)
       const melhores3 = sugestao.melhoresTerceiros.map((p: any) => p.time)
-      const adversarios = [...segundos, ...melhores3] // 12 + 8 = 20, precisamos de 16
+      const adversarios = [...segundos, ...melhores3]
 
-      const newEdits: Record<number, { pais_a: string; pais_b: string; data_hora: string; estadio: string }> = {}
+      const newEdits: Record<number, ConfrontoEdit> = {}
       const jogoNums = Object.keys(confrontosEdit).map(Number).sort((a, b) => a - b)
 
-      for (let i = 0; i < jogoNums.length && i < 16; i++) {
-        const prev = confrontosEdit[jogoNums[i]] ?? { pais_a: '', pais_b: '', data_hora: '', estadio: '' }
-        const a = primeiros[i] ?? ''
-        const b = adversarios[i] ?? ''
-        newEdits[jogoNums[i]] = { pais_a: a, pais_b: b, data_hora: prev.data_hora, estadio: prev.estadio }
+      // Preserva valores já preenchidos
+      for (const [num, edit] of Object.entries(confrontosEdit)) {
+        const n = Number(num)
+        newEdits[n] = { ...edit }
       }
+
+      // Rodada_32: sugere times dos grupos
+      const rd32Jogos = jogoNums.filter(n => n >= 73 && n <= 88)
+      for (let i = 0; i < rd32Jogos.length && i < 16; i++) {
+        const n = rd32Jogos[i]
+        newEdits[n] = {
+          ...newEdits[n],
+          pais_a: primeiros[i] ?? newEdits[n]?.pais_a ?? '',
+          pais_b: adversarios[i] ?? newEdits[n]?.pais_b ?? '',
+        }
+      }
+
+      // Oitavas (89-96): pairing padrão (73&74→89, 75&76→90, ...)
+      for (let i = 0; i < 8; i++) {
+        const n = 89 + i
+        if (!newEdits[n]) newEdits[n] = { pais_a: '', pais_b: '', data_hora: '', estadio: '', origem_a: '', origem_b: '' }
+        if (!newEdits[n].origem_a) newEdits[n].origem_a = String(73 + i * 2)
+        if (!newEdits[n].origem_b) newEdits[n].origem_b = String(73 + i * 2 + 1)
+      }
+
+      // Quartas (97-100): pairing padrão (89&90→97, 91&92→98, ...)
+      for (let i = 0; i < 4; i++) {
+        const n = 97 + i
+        if (!newEdits[n]) newEdits[n] = { pais_a: '', pais_b: '', data_hora: '', estadio: '', origem_a: '', origem_b: '' }
+        if (!newEdits[n].origem_a) newEdits[n].origem_a = String(89 + i * 2)
+        if (!newEdits[n].origem_b) newEdits[n].origem_b = String(89 + i * 2 + 1)
+      }
+
+      // Semi (101-102): pairing padrão (97&98→101, 99&100→102)
+      for (let i = 0; i < 2; i++) {
+        const n = 101 + i
+        if (!newEdits[n]) newEdits[n] = { pais_a: '', pais_b: '', data_hora: '', estadio: '', origem_a: '', origem_b: '' }
+        if (!newEdits[n].origem_a) newEdits[n].origem_a = String(97 + i * 2)
+        if (!newEdits[n].origem_b) newEdits[n].origem_b = String(97 + i * 2 + 1)
+      }
+
+      // Disputa_3o (103) e Final (104): automático
+      for (const n of [103, 104]) {
+        if (!newEdits[n]) newEdits[n] = { pais_a: '', pais_b: '', data_hora: '', estadio: '', origem_a: '', origem_b: '' }
+      }
+      if (!newEdits[103]?.origem_a) newEdits[103].origem_a = '101'
+      if (!newEdits[103]?.origem_b) newEdits[103].origem_b = '102'
+      if (!newEdits[104]?.origem_a) newEdits[104].origem_a = '101'
+      if (!newEdits[104]?.origem_b) newEdits[104].origem_b = '102'
 
       setConfrontosEdit(newEdits)
     } catch {}
@@ -413,12 +478,18 @@ export default function AdminPage() {
   const saveConfrontos = useCallback(async () => {
     setSavingConfrontos(true)
     try {
-      const confrontos = Object.entries(confrontosEdit).map(([jogo_numero, c]) => ({
+      const forcedEdits = { ...confrontosEdit }
+      // Games 103 e 104: sempre salvam como 101/102
+      if (forcedEdits[103]) { forcedEdits[103].origem_a = '101'; forcedEdits[103].origem_b = '102' }
+      if (forcedEdits[104]) { forcedEdits[104].origem_a = '101'; forcedEdits[104].origem_b = '102' }
+      const confrontos = Object.entries(forcedEdits).map(([jogo_numero, c]) => ({
         jogo_numero: Number(jogo_numero),
         pais_a: c.pais_a || null,
         pais_b: c.pais_b || null,
         data_hora: c.data_hora ? new Date(c.data_hora).toISOString() : null,
         estadio: c.estadio || null,
+        origem_a: c.origem_a ? Number(c.origem_a) : null,
+        origem_b: c.origem_b ? Number(c.origem_b) : null,
       }))
       const res = await fetch('/api/knockout', {
         method: 'POST',
@@ -968,7 +1039,7 @@ export default function AdminPage() {
         {tab === 'matamata' && (
           <div>
             <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
-              <h2 className="text-lg font-bold text-white">Configurar Rodada de 32</h2>
+              <h2 className="text-lg font-bold text-white">Configurar Mata-mata</h2>
               <div className="flex gap-2">
                 <button
                   onClick={autoFillConfrontos}
@@ -989,51 +1060,115 @@ export default function AdminPage() {
               </div>
             </div>
 
-            <p className="text-xs text-stone-500 mb-6">
-              Defina os confrontos da Rodada de 32. Use &quot;Auto-preenchimento&quot; para sugerir
-              (12 primeiros + 12 segundos + 8 melhores terceiros) ou selecione manualmente.
-            </p>
+            <div className="space-y-10">
+              {KNOCKOUT_ROUNDS.map((round) => {
+                const jogosDaFase = rodada32Jogos
+                  .filter((j) => j.fase === round.fase)
+                  .sort((a, b) => a.jogo_numero - b.jogo_numero)
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              {rodada32Jogos.map((jogo, idx) => {
-                const edit = confrontosEdit[jogo.jogo_numero] ?? { pais_a: '', pais_b: '', data_hora: '', estadio: '' }
-                const setField = (field: string, val: string) =>
-                  setConfrontosEdit((prev) => ({
-                    ...prev,
-                    [jogo.jogo_numero]: { ...edit, [field]: val },
-                  }))
                 return (
-                  <div key={jogo.jogo_numero} className="bg-stone-900 border border-stone-800 rounded-xl p-4">
-                    <div className="text-xs font-mono text-stone-500 mb-2 text-center">
-                      #{jogo.jogo_numero} — Jogo {idx + 1}
+                  <div key={round.fase}>
+                    <div className="flex items-center gap-3 mb-4">
+                      <h3 className="text-sm font-bold text-stone-300 uppercase tracking-wider">
+                        {round.label}
+                      </h3>
+                      <div className="flex-1 h-px bg-stone-800" />
+                      <span className="text-xs text-stone-600">{jogosDaFase.length} jogos</span>
                     </div>
-                    <div className="space-y-2">
-                      <TeamSelect
-                        value={edit.pais_a}
-                        onChange={(v) => setField('pais_a', v)}
-                        teams={knockoutTimes}
-                        placeholder="Time A"
-                      />
-                      <span className="block text-center text-xs text-stone-600">vs</span>
-                      <TeamSelect
-                        value={edit.pais_b}
-                        onChange={(v) => setField('pais_b', v)}
-                        teams={knockoutTimes}
-                        placeholder="Time B"
-                      />
-                      <input
-                        type="datetime-local"
-                        value={edit.data_hora}
-                        onChange={(e) => setField('data_hora', e.target.value)}
-                        className="w-full bg-stone-800 border border-stone-700 rounded-lg px-2 py-1.5 text-sm text-white focus:outline-none focus:border-emerald-500"
-                      />
-                      <input
-                        type="text"
-                        value={edit.estadio}
-                        onChange={(e) => setField('estadio', e.target.value)}
-                        placeholder="Estádio"
-                        className="w-full bg-stone-800 border border-stone-700 rounded-lg px-2 py-1.5 text-sm text-white focus:outline-none focus:border-emerald-500 placeholder:text-stone-500"
-                      />
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                      {jogosDaFase.map((jogo) => {
+                        const edit = confrontosEdit[jogo.jogo_numero] ?? { pais_a: '', pais_b: '', data_hora: '', estadio: '', origem_a: '', origem_b: '' }
+                        const setField = (field: string, val: string) =>
+                          setConfrontosEdit((prev) => ({
+                            ...prev,
+                            [jogo.jogo_numero]: { ...edit, [field]: val },
+                          }))
+
+                        const isAuto = round.type === 'auto'
+
+                        return (
+                          <div key={jogo.jogo_numero} className={clsx('bg-stone-900 border rounded-xl p-4', isAuto && 'border-stone-700/50 bg-stone-900/50')}>
+                            <div className="text-xs font-mono text-stone-500 mb-2 text-center">
+                              #{jogo.jogo_numero}
+                            </div>
+                            <div className="space-y-2">
+                              {round.type === 'team' && (
+                                <>
+                                  <TeamSelect
+                                    value={edit.pais_a}
+                                    onChange={(v) => setField('pais_a', v)}
+                                    teams={knockoutTimes}
+                                    placeholder="Time A"
+                                  />
+                                  <span className="block text-center text-xs text-stone-600">vs</span>
+                                  <TeamSelect
+                                    value={edit.pais_b}
+                                    onChange={(v) => setField('pais_b', v)}
+                                    teams={knockoutTimes}
+                                    placeholder="Time B"
+                                  />
+                                </>
+                              )}
+
+                              {isAuto && (
+                                <div className="text-center space-y-1 text-sm text-stone-400 font-mono">
+                                  {jogo.jogo_numero === 103 ? (
+                                    <div>L{edit.origem_a} vs L{edit.origem_b}</div>
+                                  ) : (
+                                    <div>W{edit.origem_a} vs W{edit.origem_b}</div>
+                                  )}
+                                </div>
+                              )}
+                              {round.type === 'source' && (
+                                <>
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-[10px] text-stone-500 shrink-0">Time A:</span>
+                                    <input
+                                      type="number"
+                                      min={1}
+                                      max={120}
+                                      value={edit.origem_a}
+                                      onChange={(e) => setField('origem_a', e.target.value)}
+                                      placeholder="Jogo #"
+                                      className="w-full bg-stone-800 border border-stone-700 rounded-lg px-2 py-1.5 text-sm text-white text-center font-mono focus:outline-none focus:border-emerald-500"
+                                    />
+                                    <span className="text-[10px] text-stone-500">vencedor</span>
+                                  </div>
+                                  <span className="block text-center text-xs text-stone-600">vs</span>
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-[10px] text-stone-500 shrink-0">Time B:</span>
+                                    <input
+                                      type="number"
+                                      min={1}
+                                      max={120}
+                                      value={edit.origem_b}
+                                      onChange={(e) => setField('origem_b', e.target.value)}
+                                      placeholder="Jogo #"
+                                      className="w-full bg-stone-800 border border-stone-700 rounded-lg px-2 py-1.5 text-sm text-white text-center font-mono focus:outline-none focus:border-emerald-500"
+                                    />
+                                    <span className="text-[10px] text-stone-500">vencedor</span>
+                                  </div>
+                                </>
+                              )}
+
+                              <input
+                                type="datetime-local"
+                                value={edit.data_hora}
+                                onChange={(e) => setField('data_hora', e.target.value)}
+                                className="w-full bg-stone-800 border border-stone-700 rounded-lg px-2 py-1.5 text-sm text-white focus:outline-none focus:border-emerald-500"
+                              />
+                              <input
+                                type="text"
+                                value={edit.estadio}
+                                onChange={(e) => setField('estadio', e.target.value)}
+                                placeholder="Estádio"
+                                className="w-full bg-stone-800 border border-stone-700 rounded-lg px-2 py-1.5 text-sm text-white focus:outline-none focus:border-emerald-500 placeholder:text-stone-500"
+                              />
+                            </div>
+                          </div>
+                        )
+                      })}
                     </div>
                   </div>
                 )

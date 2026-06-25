@@ -39,6 +39,8 @@ CREATE TABLE IF NOT EXISTS jogos (
   pais_b TEXT NOT NULL,
   data_hora TIMESTAMPTZ,
   estadio TEXT,
+  origem_a INT,
+  origem_b INT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 

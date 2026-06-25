@@ -23,6 +23,8 @@ export interface Jogo {
   pais_b: string
   data_hora: string | null
   estadio: string | null
+  origem_a: number | null
+  origem_b: number | null
   created_at?: string
 }
 

@@ -100,15 +100,20 @@ export function CalendarView({ jogos, resultados, palpites = [] }: { jogos: Jogo
     )
   }, [jogos, maxDbJogo])
 
-  const groupGamesSorted = useMemo(() => {
-    return jogos
-      .filter((j) => j.fase === 'Grupos')
-      .sort((a, b) => {
-        if (!a.data_hora) return 1
-        if (!b.data_hora) return -1
-        return new Date(a.data_hora).getTime() - new Date(b.data_hora).getTime()
-      })
+  const gamesByFaseWithData = useMemo(() => {
+    const map = new Map<string, Jogo[]>()
+    for (const j of jogos) {
+      if (!j.data_hora) continue
+      if (!map.has(j.fase)) map.set(j.fase, [])
+      map.get(j.fase)!.push(j)
+    }
+    return map
   }, [jogos])
+
+  const groupGamesSorted = useMemo(() => {
+    return (gamesByFaseWithData.get('Grupos') ?? [])
+      .sort((a, b) => new Date(a.data_hora!).getTime() - new Date(b.data_hora!).getTime())
+  }, [gamesByFaseWithData])
 
   function dateKey(iso: string): string {
     const d = new Date(iso)
@@ -351,9 +356,16 @@ export function CalendarView({ jogos, resultados, palpites = [] }: { jogos: Jogo
                             : 'bg-stone-800/50 border border-stone-700/50'
                         )}
                       >
-                        <span className="text-sm font-medium text-white truncate min-w-0">
-                          {p.nome_participante}
-                        </span>
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-sm font-medium text-white truncate">
+                            {p.nome_participante}
+                          </span>
+                          <div className="flex items-center gap-1 text-[10px] text-stone-400 mt-0.5">
+                            <TeamWithFlag name={p.pais_a} />
+                            <span className="text-stone-600">vs</span>
+                            <TeamWithFlag name={p.pais_b} />
+                          </div>
+                        </div>
                         <div className="flex items-center gap-2 shrink-0">
                           <span className="font-mono font-bold text-white text-sm">
                             {p.gol_a} × {p.gol_b}
@@ -380,6 +392,67 @@ export function CalendarView({ jogos, resultados, palpites = [] }: { jogos: Jogo
           db: dbJogoMap.get(g.jogo_numero),
         }))
 
+        const dbGamesWithDate = resolvedGames
+          .map(g => g.db)
+          .filter((db): db is Jogo => !!db?.data_hora)
+          .sort((a, b) => new Date(a.data_hora!).getTime() - new Date(b.data_hora!).getTime())
+
+        if (dbGamesWithDate.length > 0) {
+          const dateMap = new Map<string, { label: string; games: Jogo[] }>()
+          for (const j of dbGamesWithDate) {
+            const key = dateKey(j.data_hora!)
+            if (!dateMap.has(key)) {
+              const d = new Date(j.data_hora!)
+              const label = d.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })
+              dateMap.set(key, { label, games: [] })
+            }
+            dateMap.get(key)!.games.push(j)
+          }
+          const byDate = Array.from(dateMap.entries()).sort(([a], [b]) => a.localeCompare(b))
+
+          return (
+            <div key={fase}>
+              <div className="flex items-center gap-3 mb-4">
+                <h2 className="text-lg font-bold text-white">{getFaseLabel(fase)}</h2>
+                <div className="flex-1 h-px bg-stone-800" />
+                <span className="text-xs text-stone-500">{games.length} jogos</span>
+              </div>
+              <div className="space-y-6">
+                {byDate.map(([, { label, games: dayGames }]) => (
+                  <div key={label}>
+                    <div className="flex items-center gap-3 mb-3">
+                      <span className="text-sm font-bold text-stone-300 uppercase tracking-wider">{label}</span>
+                      <div className="flex-1 h-px bg-stone-800" />
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {dayGames.map((jogo) => {
+                        const dt = formatDateTime(jogo.data_hora)
+                        const resultado = resultadoMap.get(jogo.jogo_numero)
+                        const live = liveScores.get(jogo.jogo_numero)
+                        return (
+                          <GameCard
+                            key={jogo.jogo_numero}
+                            jogo_numero={jogo.jogo_numero}
+                            fase={jogo.fase}
+                            grupo={jogo.grupo}
+                            pais_a={jogo.pais_a}
+                            pais_b={jogo.pais_b}
+                            dt={dt}
+                            estadio={jogo.estadio}
+                            resultado={live ? undefined : resultado}
+                            liveScore={live ?? null}
+                            onShowPalpites={() => setSelectedGame(jogo.jogo_numero)}
+                          />
+                        )
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )
+        }
+
         return (
           <div key={fase}>
             <div className="flex items-center gap-3 mb-4">
@@ -387,7 +460,6 @@ export function CalendarView({ jogos, resultados, palpites = [] }: { jogos: Jogo
               <div className="flex-1 h-px bg-stone-800" />
               <span className="text-xs text-stone-500">{games.length} jogos</span>
             </div>
-
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
               {resolvedGames.map((g) => {
                 const resultado = resultadoMap.get(g.jogo_numero)
@@ -475,16 +547,20 @@ function GameCard({
         )}
       </div>
 
-      {placeholder || !pais_a || !pais_b ? (
+      {placeholder ? (
         <div className="text-center py-3">
           <span className="text-stone-600 text-sm">A definir</span>
         </div>
       ) : (
         <div>
           <div className="flex items-center justify-between gap-2 mb-2">
-            <span className="font-semibold text-white text-sm truncate"><TeamWithFlag name={pais_a} /></span>
+            <span className="font-semibold text-white text-sm truncate">
+              {pais_a ? <TeamWithFlag name={pais_a} /> : <span className="text-stone-500">—</span>}
+            </span>
             <span className="text-stone-600 text-xs shrink-0">vs</span>
-            <span className="font-semibold text-white text-sm truncate"><TeamWithFlag name={pais_b} /></span>
+            <span className="font-semibold text-white text-sm truncate">
+              {pais_b ? <TeamWithFlag name={pais_b} /> : <span className="text-stone-500">—</span>}
+            </span>
           </div>
 
           <div className="flex flex-col gap-1 text-xs text-stone-500">
@@ -496,10 +572,14 @@ function GameCard({
                 <span>{dt.time}</span>
               </div>
             )}
-            {estadio && !isLive && (
+            {!isLive && (
               <div className="flex items-center gap-1.5">
                 <MapPin size={10} />
-                <span className="truncate">{estadio}</span>
+                {estadio ? (
+                  <span className="truncate">{estadio}</span>
+                ) : (
+                  <span className="text-stone-600">A definir</span>
+                )}
               </div>
             )}
             {isLive && (

@@ -103,9 +103,17 @@ export async function POST(request: NextRequest) {
 
   const errors: string[] = []
   for (const c of confrontos) {
-    const { jogo_numero, pais_a, pais_b, data_hora, estadio } = c
+    const { jogo_numero, pais_a, pais_b, data_hora, estadio, origem_a, origem_b } = c
     if (!jogo_numero) { errors.push(`jogo_numero inválido: ${JSON.stringify(c)}`); continue }
     const jogoNum = Number(jogo_numero)
+
+    // Define a fase baseada no número do jogo
+    let fase = 'Rodada_32'
+    if (jogoNum >= 89 && jogoNum <= 96) fase = 'Oitavas'
+    else if (jogoNum >= 97 && jogoNum <= 100) fase = 'Quartas'
+    else if (jogoNum >= 101 && jogoNum <= 102) fase = 'Semi'
+    else if (jogoNum === 103) fase = 'Disputa_Terceiro'
+    else if (jogoNum === 104) fase = 'Final'
 
     // Upsert: insere se não existir, atualiza se já existir
     const { error } = await supabaseAdmin
@@ -113,11 +121,13 @@ export async function POST(request: NextRequest) {
       .upsert(
         {
           jogo_numero: jogoNum,
-          fase: 'Rodada_32',
+          fase,
           pais_a: (pais_a ?? '') || '',
           pais_b: (pais_b ?? '') || '',
           data_hora: data_hora || null,
           estadio: estadio || null,
+          origem_a: origem_a || null,
+          origem_b: origem_b || null,
         },
         { onConflict: 'jogo_numero' }
       )
