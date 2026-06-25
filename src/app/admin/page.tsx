@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { Upload, Save, Trash2, LogOut, CheckCircle, AlertCircle, Lock, Users, Calendar, RefreshCw, Pencil, X, Plus, Minus, Radio } from 'lucide-react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { Upload, Save, Trash2, LogOut, CheckCircle, AlertCircle, Lock, Users, Calendar, RefreshCw, Pencil, X, Plus, Minus, Radio, Search } from 'lucide-react'
 import type { Jogo, Resultado } from '@/types'
 import { TeamWithFlag } from '@/lib/countryFlags'
 import { useAuth } from '@/contexts/AuthContext'
@@ -20,6 +20,72 @@ function formatDataHora(iso: string | null): string {
   const d = new Date(iso)
   return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) +
     ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+}
+
+function toDatetimeLocal(iso: string | null): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+function TeamSelect({ value, onChange, teams, placeholder }: {
+  value: string
+  onChange: (v: string) => void
+  teams: string[]
+  placeholder: string
+}) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState(value)
+  const ref = useRef<HTMLDivElement>(null)
+
+  const filtered = teams.filter(t => t.toLowerCase().includes(query.toLowerCase()))
+
+  useEffect(() => { setQuery(value) }, [value])
+
+  useEffect(() => {
+    const handle = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handle)
+    return () => document.removeEventListener('mousedown', handle)
+  }, [])
+
+  return (
+    <div ref={ref} className="relative">
+      <div className="relative">
+        <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-stone-500 pointer-events-none" />
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => { setQuery(e.target.value); setOpen(true); onChange(e.target.value) }}
+          onFocus={() => setOpen(true)}
+          placeholder={placeholder}
+          className="w-full bg-stone-800 border border-stone-700 rounded-lg pl-7 pr-2 py-1.5 text-sm text-white focus:outline-none focus:border-emerald-500 placeholder:text-stone-500"
+        />
+      </div>
+      {open && (
+        <div className="absolute z-10 mt-1 w-full bg-stone-800 border border-stone-700 rounded-lg max-h-40 overflow-y-auto shadow-xl">
+          {filtered.length === 0 ? (
+            <div className="px-2 py-1.5 text-xs text-stone-500">Nenhum time encontrado</div>
+          ) : (
+            filtered.map(t => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => { setQuery(t); onChange(t); setOpen(false) }}
+                className={`w-full text-left px-2 py-1.5 text-sm transition-colors ${
+                  t === value ? 'text-emerald-400 bg-emerald-950/30' : 'text-white hover:bg-stone-700'
+                }`}
+              >
+                {t}
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  )
 }
 
 export default function AdminPage() {
@@ -60,7 +126,7 @@ export default function AdminPage() {
   // Mata-mata state
   const [knockoutTimes, setKnockoutTimes] = useState<string[]>([])
   const [rodada32Jogos, setRodada32Jogos] = useState<Jogo[]>([])
-  const [confrontosEdit, setConfrontosEdit] = useState<Record<number, { pais_a: string; pais_b: string }>>({})
+  const [confrontosEdit, setConfrontosEdit] = useState<Record<number, { pais_a: string; pais_b: string; data_hora: string; estadio: string }>>({})
   const [savingConfrontos, setSavingConfrontos] = useState(false)
   const [autoFillLoading, setAutoFillLoading] = useState(false)
 
@@ -297,14 +363,19 @@ export default function AdminPage() {
       }
 
       // Inicializa edits
-      const initEdits: Record<number, { pais_a: string; pais_b: string }> = {}
+      const initEdits: Record<number, { pais_a: string; pais_b: string; data_hora: string; estadio: string }> = {}
       for (const j of rd32) {
-        initEdits[j.jogo_numero] = { pais_a: j.pais_a ?? '', pais_b: j.pais_b ?? '' }
+        initEdits[j.jogo_numero] = {
+          pais_a: j.pais_a ?? '',
+          pais_b: j.pais_b ?? '',
+          data_hora: toDatetimeLocal(j.data_hora),
+          estadio: j.estadio ?? '',
+        }
       }
       if (rd32.length === 0) {
         const maxNum = todosJogos.length > 0 ? Math.max(...todosJogos.map((j) => j.jogo_numero)) : 72
         for (let i = 0; i < 16; i++) {
-          initEdits[maxNum + 1 + i] = { pais_a: '', pais_b: '' }
+          initEdits[maxNum + 1 + i] = { pais_a: '', pais_b: '', data_hora: '', estadio: '' }
         }
       }
       setConfrontosEdit(initEdits)
@@ -324,13 +395,14 @@ export default function AdminPage() {
       const melhores3 = sugestao.melhoresTerceiros.map((p: any) => p.time)
       const adversarios = [...segundos, ...melhores3] // 12 + 8 = 20, precisamos de 16
 
-      const newEdits: Record<number, { pais_a: string; pais_b: string }> = {}
+      const newEdits: Record<number, { pais_a: string; pais_b: string; data_hora: string; estadio: string }> = {}
       const jogoNums = Object.keys(confrontosEdit).map(Number).sort((a, b) => a - b)
 
       for (let i = 0; i < jogoNums.length && i < 16; i++) {
+        const prev = confrontosEdit[jogoNums[i]] ?? { pais_a: '', pais_b: '', data_hora: '', estadio: '' }
         const a = primeiros[i] ?? ''
         const b = adversarios[i] ?? ''
-        newEdits[jogoNums[i]] = { pais_a: a, pais_b: b }
+        newEdits[jogoNums[i]] = { pais_a: a, pais_b: b, data_hora: prev.data_hora, estadio: prev.estadio }
       }
 
       setConfrontosEdit(newEdits)
@@ -345,6 +417,8 @@ export default function AdminPage() {
         jogo_numero: Number(jogo_numero),
         pais_a: c.pais_a || null,
         pais_b: c.pais_b || null,
+        data_hora: c.data_hora ? new Date(c.data_hora).toISOString() : null,
+        estadio: c.estadio || null,
       }))
       const res = await fetch('/api/knockout', {
         method: 'POST',
@@ -922,40 +996,44 @@ export default function AdminPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               {rodada32Jogos.map((jogo, idx) => {
-                const edit = confrontosEdit[jogo.jogo_numero] ?? { pais_a: '', pais_b: '' }
+                const edit = confrontosEdit[jogo.jogo_numero] ?? { pais_a: '', pais_b: '', data_hora: '', estadio: '' }
+                const setField = (field: string, val: string) =>
+                  setConfrontosEdit((prev) => ({
+                    ...prev,
+                    [jogo.jogo_numero]: { ...edit, [field]: val },
+                  }))
                 return (
                   <div key={jogo.jogo_numero} className="bg-stone-900 border border-stone-800 rounded-xl p-4">
                     <div className="text-xs font-mono text-stone-500 mb-2 text-center">
                       #{jogo.jogo_numero} — Jogo {idx + 1}
                     </div>
                     <div className="space-y-2">
-                      <select
+                      <TeamSelect
                         value={edit.pais_a}
-                        onChange={(e) => setConfrontosEdit((prev) => ({
-                          ...prev,
-                          [jogo.jogo_numero]: { ...edit, pais_a: e.target.value },
-                        }))}
-                        className="w-full bg-stone-800 border border-stone-700 rounded-lg px-2 py-1.5 text-sm text-white focus:outline-none focus:border-emerald-500"
-                      >
-                        <option value="">Selecione...</option>
-                        {knockoutTimes.map((time) => (
-                          <option key={time} value={time}>{time}</option>
-                        ))}
-                      </select>
+                        onChange={(v) => setField('pais_a', v)}
+                        teams={knockoutTimes}
+                        placeholder="Time A"
+                      />
                       <span className="block text-center text-xs text-stone-600">vs</span>
-                      <select
+                      <TeamSelect
                         value={edit.pais_b}
-                        onChange={(e) => setConfrontosEdit((prev) => ({
-                          ...prev,
-                          [jogo.jogo_numero]: { ...edit, pais_b: e.target.value },
-                        }))}
+                        onChange={(v) => setField('pais_b', v)}
+                        teams={knockoutTimes}
+                        placeholder="Time B"
+                      />
+                      <input
+                        type="datetime-local"
+                        value={edit.data_hora}
+                        onChange={(e) => setField('data_hora', e.target.value)}
                         className="w-full bg-stone-800 border border-stone-700 rounded-lg px-2 py-1.5 text-sm text-white focus:outline-none focus:border-emerald-500"
-                      >
-                        <option value="">Selecione...</option>
-                        {knockoutTimes.map((time) => (
-                          <option key={time} value={time}>{time}</option>
-                        ))}
-                      </select>
+                      />
+                      <input
+                        type="text"
+                        value={edit.estadio}
+                        onChange={(e) => setField('estadio', e.target.value)}
+                        placeholder="Estádio"
+                        className="w-full bg-stone-800 border border-stone-700 rounded-lg px-2 py-1.5 text-sm text-white focus:outline-none focus:border-emerald-500 placeholder:text-stone-500"
+                      />
                     </div>
                   </div>
                 )

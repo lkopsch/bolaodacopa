@@ -103,11 +103,16 @@ export async function POST(request: NextRequest) {
 
   const errors: string[] = []
   for (const c of confrontos) {
-    const { jogo_numero, pais_a, pais_b } = c
+    const { jogo_numero, pais_a, pais_b, data_hora, estadio } = c
     if (!jogo_numero) { errors.push(`jogo_numero inválido: ${JSON.stringify(c)}`); continue }
+    const updates: Record<string, any> = {}
+    if (pais_a !== undefined) updates.pais_a = pais_a || null
+    if (pais_b !== undefined) updates.pais_b = pais_b || null
+    if (data_hora !== undefined) updates.data_hora = data_hora || null
+    if (estadio !== undefined) updates.estadio = estadio || null
     const { error } = await supabaseAdmin
       .from('jogos')
-      .update({ pais_a: pais_a || null, pais_b: pais_b || null })
+      .update(updates)
       .eq('jogo_numero', jogo_numero)
     if (error) errors.push(`Jogo #${jogo_numero}: ${error.message}`)
   }
