@@ -528,6 +528,21 @@ export default function AdminPage() {
     }).catch(() => {})
   }, [password])
 
+  const atualizarLivePenalti = useCallback((jogo_numero: number, penalti_a: number | null, penalti_b: number | null) => {
+    setLiveGames((prev) =>
+      prev.map((g) =>
+        g.jogo_numero === jogo_numero
+          ? { ...g, penalti_a, penalti_b }
+          : g
+      )
+    )
+    fetch('/api/live', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      body: JSON.stringify({ jogo_numero, penalti_a, penalti_b }),
+    }).catch(() => {})
+  }, [password])
+
   const cancelarLive = useCallback(async (jogo_numero: number) => {
     if (!confirm(`Cancelar acompanhamento ao vivo do jogo ${jogo_numero}? O placar NÃO será salvo.`)) return
     setCancellingLive(jogo_numero)
@@ -714,69 +729,119 @@ export default function AdminPage() {
                   AO VIVO ({liveGames.length})
                 </h3>
                 <div className="grid gap-3">
-                  {liveGames.map((g: any) => (
-                    <div key={g.jogo_numero} className="bg-stone-800/50 border border-stone-800 rounded-lg p-4 flex items-center justify-between gap-4">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <span className="text-xs text-stone-500 font-mono shrink-0">#{g.jogo_numero}</span>
-                        <span className="text-sm font-medium text-white truncate"><TeamWithFlag name={g.pais_a} /></span>
-                        <span className="text-stone-600 text-xs">vs</span>
-                        <span className="text-sm font-medium text-white truncate"><TeamWithFlag name={g.pais_b} /></span>
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => atualizarLive(g.jogo_numero, g.gol_a - 1, g.gol_b)}
-                            className="p-1 rounded bg-stone-700 hover:bg-stone-600 text-stone-400 hover:text-white transition-all disabled:opacity-30"
-                            disabled={g.gol_a <= 0}
-                          >
-                            <Minus size={12} />
-                          </button>
-                          <span className="text-lg font-bold font-mono text-white w-6 text-center">{g.gol_a}</span>
-                          <button
-                            onClick={() => atualizarLive(g.jogo_numero, g.gol_a + 1, g.gol_b)}
-                            className="p-1 rounded bg-stone-700 hover:bg-stone-600 text-stone-400 hover:text-white transition-all"
-                          >
-                            <Plus size={12} />
-                          </button>
+                  {liveGames.map((g: any) => {
+                    const isKnockout = g.fase !== 'Grupos'
+                    return (
+                    <div key={g.jogo_numero} className="bg-stone-800/50 border border-stone-800 rounded-lg p-4">
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <span className="text-xs text-stone-500 font-mono shrink-0">#{g.jogo_numero}</span>
+                          <span className="text-sm font-medium text-white truncate"><TeamWithFlag name={g.pais_a} /></span>
+                          <span className="text-stone-600 text-xs">vs</span>
+                          <span className="text-sm font-medium text-white truncate"><TeamWithFlag name={g.pais_b} /></span>
                         </div>
 
-                        <span className="text-stone-600">×</span>
+                        <div className="flex items-center gap-3">
+                          <div className="flex flex-col items-center">
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => atualizarLive(g.jogo_numero, g.gol_a - 1, g.gol_b)}
+                                className="p-1 rounded bg-stone-700 hover:bg-stone-600 text-stone-400 hover:text-white transition-all disabled:opacity-30"
+                                disabled={g.gol_a <= 0}
+                              >
+                                <Minus size={12} />
+                              </button>
+                              <span className="text-lg font-bold font-mono text-white w-6 text-center">{g.gol_a}</span>
+                              <button
+                                onClick={() => atualizarLive(g.jogo_numero, g.gol_a + 1, g.gol_b)}
+                                className="p-1 rounded bg-stone-700 hover:bg-stone-600 text-stone-400 hover:text-white transition-all"
+                              >
+                                <Plus size={12} />
+                              </button>
+                            </div>
+                            {isKnockout && (
+                              <div className="flex items-center gap-1 mt-1">
+                                <button
+                                  onClick={() => atualizarLivePenalti(g.jogo_numero, (g.penalti_a ?? 0) - 1, g.penalti_b)}
+                                  className="p-0.5 rounded bg-stone-700/50 hover:bg-stone-600 text-stone-500 hover:text-white transition-all disabled:opacity-30"
+                                  disabled={(g.penalti_a ?? 0) <= 0}
+                                >
+                                  <Minus size={10} />
+                                </button>
+                                <span className="text-xs font-mono text-stone-400 w-4 text-center">{g.penalti_a ?? 0}</span>
+                                <button
+                                  onClick={() => atualizarLivePenalti(g.jogo_numero, (g.penalti_a ?? 0) + 1, g.penalti_b)}
+                                  className="p-0.5 rounded bg-stone-700/50 hover:bg-stone-600 text-stone-500 hover:text-white transition-all"
+                                >
+                                  <Plus size={10} />
+                                </button>
+                              </div>
+                            )}
+                          </div>
 
-                        <div className="flex items-center gap-1">
+                          <span className="text-stone-600">×</span>
+
+                          <div className="flex flex-col items-center">
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => atualizarLive(g.jogo_numero, g.gol_a, g.gol_b - 1)}
+                                className="p-1 rounded bg-stone-700 hover:bg-stone-600 text-stone-400 hover:text-white transition-all disabled:opacity-30"
+                                disabled={g.gol_b <= 0}
+                              >
+                                <Minus size={12} />
+                              </button>
+                              <span className="text-lg font-bold font-mono text-white w-6 text-center">{g.gol_b}</span>
+                              <button
+                                onClick={() => atualizarLive(g.jogo_numero, g.gol_a, g.gol_b + 1)}
+                                className="p-1 rounded bg-stone-700 hover:bg-stone-600 text-stone-400 hover:text-white transition-all"
+                              >
+                                <Plus size={12} />
+                              </button>
+                            </div>
+                            {isKnockout && (
+                              <div className="flex items-center gap-1 mt-1">
+                                <button
+                                  onClick={() => atualizarLivePenalti(g.jogo_numero, g.penalti_a, (g.penalti_b ?? 0) - 1)}
+                                  className="p-0.5 rounded bg-stone-700/50 hover:bg-stone-600 text-stone-500 hover:text-white transition-all disabled:opacity-30"
+                                  disabled={(g.penalti_b ?? 0) <= 0}
+                                >
+                                  <Minus size={10} />
+                                </button>
+                                <span className="text-xs font-mono text-stone-400 w-4 text-center">{g.penalti_b ?? 0}</span>
+                                <button
+                                  onClick={() => atualizarLivePenalti(g.jogo_numero, g.penalti_a, (g.penalti_b ?? 0) + 1)}
+                                  className="p-0.5 rounded bg-stone-700/50 hover:bg-stone-600 text-stone-500 hover:text-white transition-all"
+                                >
+                                  <Plus size={10} />
+                                </button>
+                              </div>
+                            )}
+                          </div>
+
                           <button
-                            onClick={() => atualizarLive(g.jogo_numero, g.gol_a, g.gol_b - 1)}
-                            className="p-1 rounded bg-stone-700 hover:bg-stone-600 text-stone-400 hover:text-white transition-all disabled:opacity-30"
-                            disabled={g.gol_b <= 0}
+                            onClick={() => finalizarLive(g.jogo_numero)}
+                            disabled={endingLive === g.jogo_numero}
+                            className="flex items-center gap-1 text-xs px-2 py-1 rounded bg-emerald-900/50 hover:bg-emerald-800/50 text-emerald-400 hover:text-emerald-300 border border-emerald-800/50 transition-all disabled:opacity-50"
                           >
-                            <Minus size={12} />
+                            {endingLive === g.jogo_numero ? '...' : 'Finalizar'}
                           </button>
-                          <span className="text-lg font-bold font-mono text-white w-6 text-center">{g.gol_b}</span>
                           <button
-                            onClick={() => atualizarLive(g.jogo_numero, g.gol_a, g.gol_b + 1)}
-                            className="p-1 rounded bg-stone-700 hover:bg-stone-600 text-stone-400 hover:text-white transition-all"
+                            onClick={() => cancelarLive(g.jogo_numero)}
+                            disabled={cancellingLive === g.jogo_numero}
+                            className="flex items-center gap-1 text-xs px-2 py-1 rounded bg-red-900/50 hover:bg-red-800/50 text-red-400 hover:text-red-300 border border-red-800/50 transition-all disabled:opacity-50"
                           >
-                            <Plus size={12} />
+                            {cancellingLive === g.jogo_numero ? '...' : 'Cancelar'}
                           </button>
                         </div>
-
-                        <button
-                          onClick={() => finalizarLive(g.jogo_numero)}
-                          disabled={endingLive === g.jogo_numero}
-                          className="flex items-center gap-1 text-xs px-2 py-1 rounded bg-emerald-900/50 hover:bg-emerald-800/50 text-emerald-400 hover:text-emerald-300 border border-emerald-800/50 transition-all disabled:opacity-50"
-                        >
-                          {endingLive === g.jogo_numero ? '...' : 'Finalizar'}
-                        </button>
-                        <button
-                          onClick={() => cancelarLive(g.jogo_numero)}
-                          disabled={cancellingLive === g.jogo_numero}
-                          className="flex items-center gap-1 text-xs px-2 py-1 rounded bg-red-900/50 hover:bg-red-800/50 text-red-400 hover:text-red-300 border border-red-800/50 transition-all disabled:opacity-50"
-                        >
-                          {cancellingLive === g.jogo_numero ? '...' : 'Cancelar'}
-                        </button>
                       </div>
+                      {isKnockout && (
+                        <div className="text-[10px] text-stone-500 text-center mt-1">
+                          prorrogação/penaltis
+                        </div>
+                      )}
                     </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
             )}

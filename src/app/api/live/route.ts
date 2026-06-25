@@ -20,12 +20,12 @@ export async function GET() {
   }
 
   // Tenta ler da tabela ao_vivo
-  let aoVivoMap = new Map<number, { gol_a: number; gol_b: number; minuto: number }>()
+  let aoVivoMap = new Map<number, { gol_a: number; gol_b: number; penalti_a: number | null; penalti_b: number | null; minuto: number }>()
   try {
     const { data: liveData } = await supabase.from('jogos_ao_vivo').select('*')
     if (liveData) {
       for (const l of liveData) {
-        aoVivoMap.set(l.jogo_numero, { gol_a: l.gol_a, gol_b: l.gol_b, minuto: l.minuto })
+        aoVivoMap.set(l.jogo_numero, { gol_a: l.gol_a, gol_b: l.gol_b, penalti_a: l.penalti_a ?? null, penalti_b: l.penalti_b ?? null, minuto: l.minuto })
       }
     }
   } catch {
@@ -53,10 +53,10 @@ export async function GET() {
     if (!aoVivoMap.has(j.jogo_numero)) {
       try {
         await supabaseAdmin.from('jogos_ao_vivo').upsert(
-          { jogo_numero: j.jogo_numero, gol_a: 0, gol_b: 0, minuto: 0 },
+          { jogo_numero: j.jogo_numero, gol_a: 0, gol_b: 0, penalti_a: null, penalti_b: null, minuto: 0 },
           { onConflict: 'jogo_numero' }
         )
-        aoVivoMap.set(j.jogo_numero, { gol_a: 0, gol_b: 0, minuto: 0 })
+        aoVivoMap.set(j.jogo_numero, { gol_a: 0, gol_b: 0, penalti_a: null, penalti_b: null, minuto: 0 })
       } catch {
         // tabela pode não existir
       }
@@ -108,6 +108,8 @@ export async function GET() {
       pais_b: j.pais_b,
       gol_a: live?.gol_a ?? 0,
       gol_b: live?.gol_b ?? 0,
+      penalti_a: live?.penalti_a ?? null,
+      penalti_b: live?.penalti_b ?? null,
       minuto: Math.min(minutosPassados, 120),
       data_hora: j.data_hora,
       estadio: j.estadio,
@@ -131,7 +133,7 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json()
-  const { jogo_numero, gol_a, gol_b, action } = body
+  const { jogo_numero, gol_a, gol_b, penalti_a, penalti_b, action } = body
 
   if (!jogo_numero) {
     return NextResponse.json({ error: 'jogo_numero é obrigatório' }, { status: 400 })
@@ -160,8 +162,8 @@ export async function POST(request: NextRequest) {
         jogo_numero,
         gol_a: liveAtual.gol_a,
         gol_b: liveAtual.gol_b,
-        penalti_a: body.penalti_a ?? null,
-        penalti_b: body.penalti_b ?? null,
+        penalti_a: liveAtual.penalti_a ?? null,
+        penalti_b: liveAtual.penalti_b ?? null,
       },
       { onConflict: 'jogo_numero' }
     )
@@ -177,6 +179,8 @@ export async function POST(request: NextRequest) {
       jogo_numero,
       gol_a: gol_a ?? 0,
       gol_b: gol_b ?? 0,
+      penalti_a: penalti_a ?? null,
+      penalti_b: penalti_b ?? null,
     },
     { onConflict: 'jogo_numero' }
   )

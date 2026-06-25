@@ -64,10 +64,16 @@ CREATE TABLE IF NOT EXISTS jogos_ao_vivo (
   jogo_numero INT NOT NULL UNIQUE,
   gol_a INT NOT NULL DEFAULT 0,
   gol_b INT NOT NULL DEFAULT 0,
+  penalti_a INT,
+  penalti_b INT,
   minuto INT NOT NULL DEFAULT 0,
   status TEXT NOT NULL DEFAULT 'ao_vivo',
   iniciado_em TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Add penalti columns if table already exists (migration)
+ALTER TABLE jogos_ao_vivo ADD COLUMN IF NOT EXISTS penalti_a INT;
+ALTER TABLE jogos_ao_vivo ADD COLUMN IF NOT EXISTS penalti_b INT;
 
 ALTER TABLE jogos_ao_vivo ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Public read ao_vivo" ON jogos_ao_vivo FOR SELECT USING (true);

@@ -367,9 +367,16 @@ export function CalendarView({ jogos, resultados, palpites = [] }: { jogos: Jogo
                           </div>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
-                          <span className="font-mono font-bold text-white text-sm">
-                            {p.gol_a} × {p.gol_b}
-                          </span>
+                          <div className="flex flex-col items-center">
+                            <span className="font-mono font-bold text-white text-sm">
+                              {p.gol_a} × {p.gol_b}
+                            </span>
+                            {p.gol_a === p.gol_b && p.penalti_a != null && p.penalti_b != null && (
+                              <span className="font-mono text-[10px] text-stone-500">
+                                ({p.penalti_a} × {p.penalti_b})
+                              </span>
+                            )}
+                          </div>
                           {pontos !== null && (
                             <ScoreBadge pontos={pontos} size="sm" />
                           )}
