@@ -3,7 +3,7 @@
 import { useMemo, useState, useEffect } from 'react'
 import { Calendar, Clock, MapPin, Radio, X, Eye } from 'lucide-react'
 import type { Jogo, Resultado, Palpite } from '@/types'
-import { calcularPontos } from '@/types'
+import { calcularPontos, calcularPontosMataMata, calcularAcertosConfronto } from '@/types'
 import { ScoreBadge } from './ScoreBadge'
 import { TeamWithFlag } from '@/lib/countryFlags'
 import { getFaseLabel, FASES_ORDER } from '@/lib/excel-parser'
@@ -345,7 +345,14 @@ export function CalendarView({ jogos, resultados, palpites = [] }: { jogos: Jogo
                     .sort((a, b) => a.nome_participante.localeCompare(b.nome_participante))
                     .map((p) => {
                     const resultado = resultadoMap.get(p.jogo_numero)
-                    const pontos = resultado ? calcularPontos(p, resultado) : null
+                    const jogo = dbJogoMap.get(p.jogo_numero)
+                    const isKnockout = p.fase !== 'Grupos'
+                    const pontos = resultado && isKnockout && jogo
+                      ? calcularPontosMataMata(p, resultado, jogo)
+                      : resultado
+                        ? calcularPontos(p, resultado)
+                        : null
+                    const confronto = isKnockout && jogo ? calcularAcertosConfronto(p, jogo) : null
                     return (
                       <div
                         key={p.nome_participante}
@@ -360,10 +367,24 @@ export function CalendarView({ jogos, resultados, palpites = [] }: { jogos: Jogo
                           <span className="text-sm font-medium text-white truncate">
                             {p.nome_participante}
                           </span>
-                          <div className="flex items-center gap-1 text-[10px] text-stone-400 mt-0.5">
-                            <TeamWithFlag name={p.pais_a} />
+                          <div className="flex items-center gap-1 text-[10px] text-stone-400 mt-0.5 flex-wrap">
+                            <span className="flex items-center gap-0.5">
+                              <TeamWithFlag name={p.pais_a} />
+                              {isKnockout && jogo?.pais_a === p.pais_a ? (
+                                <span className="text-green-400 font-bold">✓</span>
+                              ) : isKnockout && jogo?.pais_a && jogo.pais_a !== p.pais_a ? (
+                                <span className="text-red-400 font-bold">✗</span>
+                              ) : null}
+                            </span>
                             <span className="text-stone-600">vs</span>
-                            <TeamWithFlag name={p.pais_b} />
+                            <span className="flex items-center gap-0.5">
+                              <TeamWithFlag name={p.pais_b} />
+                              {isKnockout && jogo?.pais_b === p.pais_b ? (
+                                <span className="text-green-400 font-bold">✓</span>
+                              ) : isKnockout && jogo?.pais_b && jogo.pais_b !== p.pais_b ? (
+                                <span className="text-red-400 font-bold">✗</span>
+                              ) : null}
+                            </span>
                           </div>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">

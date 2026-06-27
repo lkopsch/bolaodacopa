@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react'
 import type { Palpite, Resultado, Jogo } from '@/types'
-import { calcularPontos } from '@/types'
+import { calcularPontosMataMata, calcularAcertosConfronto } from '@/types'
 import { getFaseLabel } from '@/lib/excel-parser'
 import { TeamWithFlag } from '@/lib/countryFlags'
 import { ScoreBadge } from './ScoreBadge'
@@ -20,6 +20,11 @@ export function PalpitesMataMata({
   const resultadoMap = useMemo(
     () => new Map(resultados.map((r) => [r.jogo_numero, r])),
     [resultados]
+  )
+
+  const jogoMap = useMemo(
+    () => new Map(jogos.map((j) => [j.jogo_numero, j])),
+    [jogos]
   )
 
   const knockoutPalpites = useMemo(() => {
@@ -77,7 +82,9 @@ export function PalpitesMataMata({
                 <tbody className="divide-y divide-stone-800/50">
                   {palpitesDaFase.map((p) => {
                     const resultado = resultadoMap.get(p.jogo_numero)
-                    const pontos = resultado ? calcularPontos(p, resultado) : null
+                    const jogo = jogoMap.get(p.jogo_numero)
+                    const pontos = resultado && jogo ? calcularPontosMataMata(p, resultado, jogo) : null
+                    const confronto = jogo ? calcularAcertosConfronto(p, jogo) : null
                     return (
                       <tr key={`${p.nome_participante}-${p.jogo_numero}`} className="hover:bg-stone-800/40 transition-colors">
                         <td className="py-2 pr-2 text-stone-500 font-mono">
@@ -87,10 +94,24 @@ export function PalpitesMataMata({
                           {p.nome_participante.split(' ')[0]}
                         </td>
                         <td className="py-2 pr-2">
-                          <div className="flex items-center gap-1">
-                            <TeamWithFlag name={p.pais_a} />
+                          <div className="flex flex-col gap-0.5">
+                            <div className="flex items-center gap-1">
+                              <TeamWithFlag name={p.pais_a} />
+                              {jogo?.pais_a === p.pais_a ? (
+                                <span className="text-green-400 text-[10px] font-bold">✓</span>
+                              ) : jogo?.pais_a && jogo.pais_a !== p.pais_a ? (
+                                <span className="text-red-400 text-[10px] font-bold">✗</span>
+                              ) : null}
+                            </div>
                             <span className="text-stone-600 text-[10px]">vs</span>
-                            <TeamWithFlag name={p.pais_b} />
+                            <div className="flex items-center gap-1">
+                              <TeamWithFlag name={p.pais_b} />
+                              {jogo?.pais_b === p.pais_b ? (
+                                <span className="text-green-400 text-[10px] font-bold">✓</span>
+                              ) : jogo?.pais_b && jogo.pais_b !== p.pais_b ? (
+                                <span className="text-red-400 text-[10px] font-bold">✗</span>
+                              ) : null}
+                            </div>
                           </div>
                         </td>
                         <td className="py-2 pr-2 text-center">

@@ -1,16 +1,18 @@
 'use client'
 
 import type { ParticipanteRanking } from '@/types'
+import { AlertTriangle } from 'lucide-react'
 import clsx from 'clsx'
 
 interface RankingTableProps {
   ranking: ParticipanteRanking[]
   positionChanges?: Record<string, number>
+  mmAtivo?: boolean
 }
 
 const medalhas = ['🥇', '🥈', '🥉']
 
-export function RankingTable({ ranking, positionChanges }: RankingTableProps) {
+export function RankingTable({ ranking, positionChanges, mmAtivo = false }: RankingTableProps) {
   if (ranking.length === 0) {
     return (
       <div className="text-center py-12 text-stone-500">
@@ -34,7 +36,13 @@ export function RankingTable({ ranking, positionChanges }: RankingTableProps) {
             <th className="text-right pb-3 pr-4 font-medium hidden sm:table-cell" title="Jogos palpitados">J</th>
             <th className="text-right pb-3 pr-4 font-medium hidden sm:table-cell" title="Acertou um lado do placar (1pt)">xG</th>
             <th className="text-right pb-3 pr-4 font-medium hidden sm:table-cell" title="Acertou o resultado (5-6pts)">R</th>
-            <th className="text-right pb-3 font-medium hidden md:table-cell" title="Resultado exato (10pts)">RE</th>
+            <th className="text-right pb-3 pr-4 font-medium hidden md:table-cell" title="Resultado exato (10pts)">RE</th>
+            <th className="text-right pb-3 font-medium hidden md:table-cell" title={mmAtivo ? 'Acertos de times no Mata-Mata' : 'Aguardando todos os resultados da fase de grupos'}>
+              <span className="inline-flex items-center gap-1">
+                {!mmAtivo && <AlertTriangle size={12} className="text-amber-400" />}
+                <span className={!mmAtivo ? 'text-amber-400/80' : ''}>MM</span>
+              </span>
+            </th>
           </tr>
         </thead>
         <tbody className="divide-y divide-stone-800/50">
@@ -113,6 +121,9 @@ export function RankingTable({ ranking, positionChanges }: RankingTableProps) {
                 <td className="py-3 pr-4 text-right hidden md:table-cell">
                   <span className="text-amber-400 font-mono">{p.acertos_placar}</span>
                 </td>
+                <td className="py-3 pr-4 text-right hidden md:table-cell">
+                  <span className={clsx('font-mono', p.mm_acertos > 0 ? 'text-purple-400' : 'text-stone-600')}>{p.mm_acertos}</span>
+                </td>
               </tr>
             )
           })}
@@ -124,6 +135,11 @@ export function RankingTable({ ranking, positionChanges }: RankingTableProps) {
         <span><span className="text-amber-400">RE</span> = resultado exato (10pts)</span>
         <span><span className="text-emerald-400">R</span> = acertou resultado (5-6pts)</span>
         <span><span className="text-sky-400">xG</span> = acertou um lado (1pt)</span>
+        {mmAtivo ? (
+          <span><span className="text-purple-400">MM</span> = acertos de times no mata-mata (+10pts cada)</span>
+        ) : (
+          <span><span className="text-amber-400/80"><AlertTriangle size={10} className="inline" /></span> MM = Aguardando resultados dos grupos</span>
+        )}
       </div>
     </div>
   )

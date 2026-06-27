@@ -25,6 +25,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [aoVivoIds, setAoVivoIds] = useState<number[]>([])
+  const [mmAtivo, setMmAtivo] = useState(false)
   const [liveGames, setLiveGames] = useState<any[]>([])
   const [liveLoading, setLiveLoading] = useState(true)
 
@@ -51,6 +52,7 @@ export default function Home() {
       setJogos(jogosRes)
       setRanking(palpitesRes.ranking)
       setAoVivoIds(palpitesRes.ao_vivo ?? [])
+      setMmAtivo(palpitesRes.mm_ativo ?? false)
 
       const aoVivoAtual = palpitesRes.ao_vivo ?? []
 
@@ -351,7 +353,7 @@ export default function Home() {
                   <Trophy className="text-amber-400" size={20} />
                   Classificação Geral
                 </h2>
-                <RankingTable ranking={ranking} positionChanges={positionChanges} />
+                <RankingTable ranking={ranking} positionChanges={positionChanges} mmAtivo={mmAtivo} />
               </div>
             )}
 
