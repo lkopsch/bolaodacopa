@@ -58,9 +58,6 @@ function buildRanking(
     const podio = podiumPontos.get(entry.nome) ?? 0
     entry.pontos_total += podio
     entry.pontos_podio = podio
-    if (mmAtivo) {
-      entry.pontos_total += entry.mm_acertos * 10
-    }
   }
 
   return Array.from(rankingMap.values()).sort(

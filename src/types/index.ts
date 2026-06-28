@@ -116,7 +116,10 @@ export function calcularPontosMataMata(palpite: Palpite, resultado: Resultado, j
 
   if (!teamACorrect && !teamBCorrect) return 0
 
-  const confrontoBonus = teamACorrect && teamBCorrect ? 10 : 5
+  let confrontoBonus = 0
+  if (teamACorrect) confrontoBonus += 5
+  if (teamBCorrect) confrontoBonus += 5
+  if ((teamACorrect && !teamBCorrect) || (!teamACorrect && teamBCorrect)) confrontoBonus -= 1
 
   let pontos = 0
 

@@ -135,11 +135,7 @@ export function RankingTable({ ranking, positionChanges, mmAtivo = false }: Rank
         <span><span className="text-amber-400">RE</span> = resultado exato (10pts)</span>
         <span><span className="text-emerald-400">R</span> = acertou resultado (5-6pts)</span>
         <span><span className="text-sky-400">xG</span> = acertou um lado (1pt)</span>
-        {mmAtivo ? (
-          <span><span className="text-purple-400">MM</span> = acertos de times no mata-mata (+10pts cada)</span>
-        ) : (
-          <span><span className="text-amber-400/80"><AlertTriangle size={10} className="inline" /></span> MM = Aguardando resultados dos grupos</span>
-        )}
+        <span><span className="text-purple-400">MM</span> = times corretos no mata-mata (5pts cada, -1 se errar 1)</span>
       </div>
     </div>
   )
