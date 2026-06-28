@@ -3,7 +3,7 @@
 import { useMemo, useState, useEffect } from 'react'
 import { Calendar, Clock, MapPin, Radio, X, Eye } from 'lucide-react'
 import type { Jogo, Resultado, Palpite } from '@/types'
-import { calcularPontos, calcularPontosMataMata, calcularAcertosConfronto } from '@/types'
+import { calcularPontos, calcularPontosMataMata, calcularAcertosConfronto, descreverPontos, descreverPontosMataMata } from '@/types'
 import { ScoreBadge } from './ScoreBadge'
 import { TeamWithFlag } from '@/lib/countryFlags'
 import { getFaseLabel, FASES_ORDER } from '@/lib/excel-parser'
@@ -158,7 +158,7 @@ export function CalendarView({ jogos, resultados, palpites = [] }: { jogos: Jogo
   const filteredGamesByDate = useMemo(() => {
     if (showAllFase) return gamesByDate
 
-    if (nextGameNum === null) return gamesByDate
+    if (nextGameNum === null) return []
 
     return gamesByDate
       .map(([key, val]) => {
@@ -336,6 +336,11 @@ export function CalendarView({ jogos, resultados, palpites = [] }: { jogos: Jogo
                       : resultado
                         ? calcularPontos(p, resultado)
                         : null
+                    const descricao = resultado && isKnockout && jogo
+                      ? descreverPontosMataMata(p, resultado, jogo)
+                      : resultado
+                        ? descreverPontos(p, resultado)
+                        : undefined
                     const confronto = isKnockout && jogo ? calcularAcertosConfronto(p, jogo) : null
                     return (
                       <div
@@ -383,7 +388,7 @@ export function CalendarView({ jogos, resultados, palpites = [] }: { jogos: Jogo
                             )}
                           </div>
                           {pontos !== null && (
-                            <ScoreBadge pontos={pontos} size="sm" />
+                            <ScoreBadge pontos={pontos} size="sm" descricao={descricao} />
                           )}
                         </div>
                       </div>
@@ -404,7 +409,17 @@ export function CalendarView({ jogos, resultados, palpites = [] }: { jogos: Jogo
           db: dbJogoMap.get(g.jogo_numero),
         }))
 
-        const dbGamesWithDate = resolvedGames
+        const jogosVisiveis = showAllFase
+          ? resolvedGames
+          : resolvedGames.filter((g) => {
+              if (!g.db) return true
+              if (liveGameNumeros.has(g.db.jogo_numero)) return true
+              return !resultadoMap.has(g.db.jogo_numero)
+            })
+
+        if (jogosVisiveis.length === 0) return null
+
+        const dbGamesWithDate = jogosVisiveis
           .map(g => g.db)
           .filter((db): db is Jogo => !!db?.data_hora)
           .sort((a, b) => new Date(a.data_hora!).getTime() - new Date(b.data_hora!).getTime())
@@ -473,7 +488,7 @@ export function CalendarView({ jogos, resultados, palpites = [] }: { jogos: Jogo
               <span className="text-xs text-stone-500">{games.length} jogos</span>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-              {resolvedGames.map((g) => {
+              {jogosVisiveis.map((g) => {
                 const resultado = resultadoMap.get(g.jogo_numero)
                 const dt = g.db ? formatDateTime(g.db.data_hora) : null
                 const live = liveScores.get(g.jogo_numero)

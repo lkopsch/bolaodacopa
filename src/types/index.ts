@@ -119,7 +119,6 @@ export function calcularPontosMataMata(palpite: Palpite, resultado: Resultado, j
   let confrontoBonus = 0
   if (teamACorrect) confrontoBonus += 5
   if (teamBCorrect) confrontoBonus += 5
-  if ((teamACorrect && !teamBCorrect) || (!teamACorrect && teamBCorrect)) confrontoBonus -= 1
 
   let pontos = 0
 
@@ -131,17 +130,83 @@ export function calcularPontosMataMata(palpite: Palpite, resultado: Resultado, j
 
   if (palpiteOutcome === resOutcome) pontos += 5
 
-  if (palpite.gol_a === resultado.gol_a && palpite.gol_b === resultado.gol_b) {
-    if (resultado.penalti_a !== null && palpite.penalti_a !== null) {
-      if (palpite.penalti_a === resultado.penalti_a && palpite.penalti_b === resultado.penalti_b) {
-        pontos += 3
-      }
-    } else {
-      pontos += 3
+  let isExactScore = palpite.gol_a === resultado.gol_a && palpite.gol_b === resultado.gol_b
+  if (isExactScore && resultado.penalti_a !== null && palpite.penalti_a !== null) {
+    isExactScore = palpite.penalti_a === resultado.penalti_a && palpite.penalti_b === resultado.penalti_b
+  }
+
+  if (isExactScore) {
+    pontos += 3
+    if ((teamACorrect && !teamBCorrect) || (!teamACorrect && teamBCorrect)) {
+      confrontoBonus -= 1
     }
   }
 
   return confrontoBonus + pontos
+}
+
+function descreverItens(resultado: Resultado, palpite: Palpite): string[] {
+  const itens: string[] = []
+
+  const palpiteOutcome = palpite.gol_a > palpite.gol_b ? 'A' : palpite.gol_b > palpite.gol_a ? 'B' : 'E'
+  const resOutcome = resultado.gol_a > resultado.gol_b ? 'A' : resultado.gol_b > resultado.gol_a ? 'B' : 'E'
+
+  if (palpiteOutcome === resOutcome) {
+    const label = palpiteOutcome === 'A' ? palpite.pais_a : palpiteOutcome === 'B' ? palpite.pais_b : 'Empate'
+    itens.push(`5pt resultado (${label})`)
+  }
+
+  return itens
+}
+
+export function descreverPontos(palpite: Palpite, resultado: Resultado): string[] {
+  const itens: string[] = []
+
+  if (palpite.gol_a === resultado.gol_a) itens.push(`1pt gol ${palpite.pais_a}`)
+  if (palpite.gol_b === resultado.gol_b) itens.push(`1pt gol ${palpite.pais_b}`)
+
+  itens.push(...descreverItens(resultado, palpite))
+
+  if (palpite.gol_a === resultado.gol_a && palpite.gol_b === resultado.gol_b) {
+    let bonus = true
+    if (resultado.penalti_a !== null && palpite.penalti_a !== null) {
+      bonus = palpite.penalti_a === resultado.penalti_a && palpite.penalti_b === resultado.penalti_b
+    }
+    if (bonus) itens.push('3pt bônus placar exato')
+  }
+
+  return itens
+}
+
+export function descreverPontosMataMata(palpite: Palpite, resultado: Resultado, jogo: Jogo): string[] {
+  const teamACorrect = !!(jogo.pais_a && palpite.pais_a === jogo.pais_a)
+  const teamBCorrect = !!(jogo.pais_b && palpite.pais_b === jogo.pais_b)
+
+  if (!teamACorrect && !teamBCorrect) return []
+
+  const itens: string[] = []
+
+  if (teamACorrect) itens.push(`5pt ${palpite.pais_a}`)
+  if (teamBCorrect) itens.push(`5pt ${palpite.pais_b}`)
+
+  if (teamACorrect && palpite.gol_a === resultado.gol_a) itens.push(`1pt gol ${palpite.pais_a}`)
+  if (teamBCorrect && palpite.gol_b === resultado.gol_b) itens.push(`1pt gol ${palpite.pais_b}`)
+
+  itens.push(...descreverItens(resultado, palpite))
+
+  let isExactScore = palpite.gol_a === resultado.gol_a && palpite.gol_b === resultado.gol_b
+  if (isExactScore && resultado.penalti_a !== null && palpite.penalti_a !== null) {
+    isExactScore = palpite.penalti_a === resultado.penalti_a && palpite.penalti_b === resultado.penalti_b
+  }
+
+  if (isExactScore) {
+    itens.push('3pt bônus placar exato')
+    if ((teamACorrect && !teamBCorrect) || (!teamACorrect && teamBCorrect)) {
+      itens.push('-1pt time errado')
+    }
+  }
+
+  return itens
 }
 
 function getMatchWinner(paisA: string, paisB: string, resultado: Resultado): string {

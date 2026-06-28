@@ -1,10 +1,10 @@
 'use client'
 
 import { useMemo } from 'react'
-import { Trophy, ArrowRight } from 'lucide-react'
+import { Trophy } from 'lucide-react'
 import type { Jogo, Resultado } from '@/types'
 import { getFaseLabel } from '@/lib/excel-parser'
-import { TeamWithFlag } from '@/lib/countryFlags'
+import { FlagOnly } from '@/lib/countryFlags'
 import clsx from 'clsx'
 
 interface BracketGame {
@@ -13,171 +13,369 @@ interface BracketGame {
   pais_a: string | null
   pais_b: string | null
   resultado: Resultado | undefined
+  origem_a: number | null
+  origem_b: number | null
+  data_hora: string | null
 }
 
-function getWinner(resultado: Resultado | undefined): 'A' | 'B' | null {
-  if (!resultado) return null
-  if (resultado.penalti_a != null && resultado.penalti_b != null && resultado.penalti_a !== resultado.penalti_b) {
-    return resultado.penalti_a > resultado.penalti_b ? 'A' : 'B'
+function getWinner(g: BracketGame): 'A' | 'B' | null {
+  if (!g.resultado) return null
+  if (g.resultado.penalti_a != null && g.resultado.penalti_b != null && g.resultado.penalti_a !== g.resultado.penalti_b) {
+    return g.resultado.penalti_a > g.resultado.penalti_b ? 'A' : 'B'
   }
-  if (resultado.gol_a > resultado.gol_b) return 'A'
-  if (resultado.gol_b > resultado.gol_a) return 'B'
+  if (g.resultado.gol_a > g.resultado.gol_b) return 'A'
+  if (g.resultado.gol_b > g.resultado.gol_a) return 'B'
   return null
 }
 
 function getWinnerName(g: BracketGame): string | null {
-  const w = getWinner(g.resultado)
+  const w = getWinner(g)
   if (w === 'A') return g.pais_a
   if (w === 'B') return g.pais_b
   return null
 }
 
-const ROUND_CONFIG: { fase: string; count: number }[] = [
-  { fase: 'Rodada_32', count: 16 },
-  { fase: 'Oitavas', count: 8 },
-  { fase: 'Quartas', count: 4 },
-  { fase: 'Semi', count: 2 },
-  { fase: 'Final', count: 1 },
-]
+const CARD_W = 80
 
-export function KnockoutBracket({
-  jogos,
-  resultados,
-}: {
-  jogos: Jogo[]
-  resultados: Resultado[]
-}) {
-  const resultadoMap = useMemo(
-    () => new Map(resultados.map((r) => [r.jogo_numero, r])),
-    [resultados]
+function GameSlot({ g, highlight }: { g: BracketGame; highlight?: boolean }) {
+  const hasResult = !!g.resultado
+  const winner = getWinner(g)
+
+  if (!g.pais_a && !g.pais_b) {
+    return <div className="w-3 h-3 rounded-full bg-stone-800 border border-dashed border-stone-700 mx-auto" />
+  }
+
+  return (
+    <div className={clsx(
+      'bg-stone-900 border rounded-sm',
+      hasResult ? 'border-emerald-500/20' : 'border-stone-800',
+      highlight && 'ring-1 ring-amber-400/30',
+    )}>
+      <div className="text-[8px] text-stone-500 font-mono text-center leading-tight border-b border-stone-800 py-0.5">
+        J{g.jogo_numero}
+      </div>
+      <div className="py-1" style={{ width: CARD_W - 2 }}>
+        <TeamRow
+          name={g.pais_a}
+          score={hasResult ? g.resultado!.gol_a : null}
+          winner={winner === 'A'}
+        />
+        <TeamRow
+          name={g.pais_b}
+          score={hasResult ? g.resultado!.gol_b : null}
+          winner={winner === 'B'}
+        />
+      </div>
+    </div>
   )
+}
 
-  const sortedJogos = useMemo(
-    () => [...jogos].sort((a, b) => a.jogo_numero - b.jogo_numero),
-    [jogos]
+function TeamRow({ name, score, winner }: { name: string | null; score: number | null; winner: boolean }) {
+  return (
+    <div className={clsx(
+      'flex items-center gap-1',
+      winner ? 'opacity-100' : 'opacity-70',
+    )}>
+      <FlagOnly name={name} />
+      <span className={clsx(
+        'text-[9px] font-semibold truncate flex-1 min-w-0',
+        winner ? 'text-white' : 'text-stone-400',
+      )}>
+        {name || '—'}
+      </span>
+      {score !== null && (
+        <span className={clsx(
+          'font-mono font-bold text-[11px] min-w-[14px] text-right',
+          winner ? 'text-white' : 'text-stone-500',
+        )}>
+          {score}
+        </span>
+      )}
+    </div>
   )
+}
 
-  const gamesByFase = useMemo(() => {
-    const map = new Map<string, BracketGame[]>()
-    for (const j of sortedJogos) {
+function buildTree(
+  game: BracketGame | undefined,
+  gameMap: Map<number, BracketGame>,
+): { game: BracketGame; left: any; right: any } | null {
+  if (!game) return null
+  const left = game.origem_a ? buildTree(gameMap.get(game.origem_a), gameMap) : null
+  const right = game.origem_b ? buildTree(gameMap.get(game.origem_b), gameMap) : null
+  return { game, left, right }
+}
+
+interface SlotInfo {
+  col: number
+  row: number
+  span: number
+}
+
+function flattenTree(
+  node: { game: BracketGame; left: any; right: any } | null,
+  depth: number,
+  slots: Map<number, SlotInfo>,
+  isLeft: boolean,
+  rowOffset: number,
+  totalSpan: number,
+) {
+  if (!node) return
+  const span = totalSpan / Math.pow(2, depth)
+  const row = rowOffset + span / 2
+  const col = isLeft ? 3 - depth : 5 + depth
+  slots.set(node.game.jogo_numero, { col, row, span })
+  flattenTree(node.left, depth + 1, slots, isLeft, rowOffset, totalSpan)
+  flattenTree(node.right, depth + 1, slots, isLeft, rowOffset + span, totalSpan)
+}
+
+const COL_LABELS = ['Rodada_32', 'Oitavas', 'Quartas', 'Semis', 'Final / 3º', 'Semis', 'Quartas', 'Oitavas', 'Rodada_32']
+const ROW_H = 60
+const TOTAL_LEAVES = 8
+
+export function KnockoutBracket({ jogos, resultados }: { jogos: Jogo[]; resultados: Resultado[] }) {
+  const resultadoMap = useMemo(() => new Map(resultados.map((r) => [r.jogo_numero, r])), [resultados])
+
+  const gameMap = useMemo(() => {
+    const m = new Map<number, BracketGame>()
+    for (const j of jogos) {
       if (j.fase === 'Grupos') continue
-      const g: BracketGame = {
+      m.set(j.jogo_numero, {
         jogo_numero: j.jogo_numero,
         fase: j.fase,
         pais_a: j.pais_a || null,
         pais_b: j.pais_b || null,
         resultado: resultadoMap.get(j.jogo_numero),
+        origem_a: j.origem_a || null,
+        origem_b: j.origem_b || null,
+        data_hora: j.data_hora,
+      })
+    }
+
+    // Resolve knockout teams: fill empty pais_a/b from the winner of the origem game
+    const sorted = [...m.keys()].sort((a, b) => a - b)
+    for (const num of sorted) {
+      const g = m.get(num)!
+      if (g.origem_a && !g.pais_a) {
+        const src = m.get(g.origem_a)
+        if (src) {
+          const w = getWinnerName(src)
+          if (w) g.pais_a = w
+        }
       }
-      if (!map.has(j.fase)) map.set(j.fase, [])
-      map.get(j.fase)!.push(g)
+      if (g.origem_b && !g.pais_b) {
+        const src = m.get(g.origem_b)
+        if (src) {
+          const w = getWinnerName(src)
+          if (w) g.pais_b = w
+        }
+      }
     }
 
-    for (const { fase, count } of ROUND_CONFIG) {
-      if (!map.has(fase)) map.set(fase, [])
-    }
-    if (!map.has('Disputa_Terceiro')) map.set('Disputa_Terceiro', [])
+    return m
+  }, [jogos, resultadoMap])
 
-    return map
-  }, [sortedJogos, resultadoMap])
+  const bracketData = useMemo(() => {
+    if (gameMap.size === 0) return null
 
-  const resolveGame = (idx: number, fase: string): BracketGame => {
-    const games = gamesByFase.get(fase) ?? []
-    return games[idx] ?? { jogo_numero: 0, fase, pais_a: null, pais_b: null, resultado: undefined }
-  }
+    const sf101 = gameMap.get(101)
+    const sf102 = gameMap.get(102)
+    if (!sf101 || !sf102) return null
 
-  const terceiroGames = gamesByFase.get('Disputa_Terceiro') ?? []
+    const leftTree = buildTree(sf101, gameMap)
+    const rightTree = buildTree(sf102, gameMap)
+    const slots = new Map<number, SlotInfo>()
+
+    flattenTree(leftTree, 0, slots, true, 0, TOTAL_LEAVES)
+    flattenTree(rightTree, 0, slots, false, 0, TOTAL_LEAVES)
+
+    const final104 = gameMap.get(104)
+    if (final104) slots.set(104, { col: 4, row: 2, span: 1 })
+    const third103 = gameMap.get(103)
+    if (third103) slots.set(103, { col: 4, row: 5, span: 1 })
+
+    return { leftTree, rightTree, slots }
+  }, [gameMap])
 
   const champion = useMemo(() => {
-    const finalGame = (gamesByFase.get('Final') ?? [])[0]
+    const finalGame = gameMap.get(104)
     if (!finalGame?.resultado) return null
     return getWinnerName(finalGame)
-  }, [gamesByFase])
+  }, [gameMap])
+
+  if (!bracketData) {
+    return (
+      <div className="text-center py-12 text-stone-500">
+        <p className="text-3xl mb-2">⚔️</p>
+        <p>Bracket ainda não disponível. Complete os jogos de grupos primeiro.</p>
+      </div>
+    )
+  }
+
+  const allSlots = Array.from(bracketData.slots.entries())
+  const maxRow = allSlots.length > 0 ? Math.max(...allSlots.map(([_, s]) => s.row)) : 0
+  const columnH = Math.max((maxRow + 1) * ROW_H, TOTAL_LEAVES * ROW_H) + 20
+
+  const childToParent = useMemo(() => {
+    const map = new Map<number, { parentNum: number; type: 'a' | 'b' }>()
+    for (const [num, g] of gameMap) {
+      if (g.origem_a) map.set(g.origem_a, { parentNum: num, type: 'a' })
+      if (g.origem_b) map.set(g.origem_b, { parentNum: num, type: 'b' })
+    }
+    return map
+  }, [gameMap])
+
+  function ConnectorLine({ dir, top, h, topChild }: { dir: 'l' | 'r'; top: number | string; h: number; topChild: boolean }) {
+    const isRight = dir === 'r'
+    return (
+      <div
+        className="absolute pointer-events-none"
+        style={{
+          [isRight ? 'left' : 'right']: '100%',
+          top,
+          width: 12,
+          height: h,
+          overflow: 'visible',
+        }}
+      >
+        <svg width={12} height={h} viewBox={`0 0 12 ${h}`}>
+          <path
+            d={isRight
+              ? (topChild ? `M0,0 H6 V${h}` : `M0,${h} H6 V0`)
+              : (topChild ? `M12,0 H6 V${h}` : `M12,${h} H6 V0`)
+            }
+            stroke="rgb(120 113 108)" strokeWidth="1.5" fill="none"
+          />
+        </svg>
+      </div>
+    )
+  }
 
   return (
-    <div className="space-y-8">
-      {/* Bracket visualization */}
-      <div className="overflow-x-auto pb-4">
-        <div className="flex gap-6 min-w-max">
-          {ROUND_CONFIG.map(({ fase, count }, roundIdx) => {
-            const games = gamesByFase.get(fase) ?? []
-            const hasGames = games.some((g) => g.pais_a && g.pais_b)
+    <div className="bg-stone-900 border border-stone-800 rounded-2xl p-6 space-y-6 w-full">
+      <div className="w-[90%] mx-auto">
+        <div className="flex" style={{ gap: 12 }}>
+          {COL_LABELS.map((fase, colIdx) => {
+            const isCenter = colIdx === 4
 
             return (
-              <div key={fase} className="flex flex-col justify-around min-w-0" style={{ width: 180 }}>
-                {/* Round header */}
-                <h3 className="text-xs font-bold text-stone-400 uppercase tracking-wider text-center mb-4 pb-2 border-b border-stone-800">
-                  {getFaseLabel(fase)}
-                </h3>
+              <div key={colIdx} className="flex flex-col flex-1 min-w-0">
+                {isCenter ? (
+                  <div className="text-center pb-2 border-b border-stone-800 mb-2">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-amber-400">Final</h3>
+                    <h4 className="text-[10px] text-stone-500 uppercase tracking-wider mt-0.5">3º Lugar</h4>
+                  </div>
+                ) : (
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-center pb-2 border-b border-stone-800 mb-2 text-stone-400">
+                    {getFaseLabel(fase)}
+                  </h3>
+                )}
 
-                <div className={clsx(
-                  'flex flex-col',
-                  count === 16 && 'gap-1',
-                  count === 8 && 'gap-3',
-                  count === 4 && 'gap-6',
-                  count === 2 && 'gap-10',
-                  count === 1 && 'gap-0 justify-center flex-1'
-                )}>
-                  {Array.from({ length: count }).map((_, i) => {
-                    const g = games[i]
-                    if (!g || (!g.pais_a && !g.pais_b)) {
+                <div className="relative overflow-visible" style={{ height: columnH }}>
+                  {allSlots
+                    .filter(([_, s]) => s.col === colIdx)
+                    .map(([num, slot]) => {
+                      const g = gameMap.get(num)
+                      if (!g) return null
+                      const isFinal = num === 104
+                      const isThird = num === 103
+
+                      const isChild = childToParent.has(num)
+                      const hasChildren = !!(g.origem_a || g.origem_b)
+
+                      // Calculate child connector (toward parent)
+                      let childDir: 'l' | 'r' = 'r'
+                      let connectorH = 0
+                      let isTopChild = false
+                      if (isChild) {
+                        const ci = childToParent.get(num)!
+                        const parentGame = gameMap.get(ci.parentNum)
+                        const parentSlot = bracketData.slots.get(ci.parentNum)
+                        if (parentSlot) {
+                          childDir = parentSlot.col > slot.col ? 'r' : 'l'
+                        }
+                        const siblingNum = ci.type === 'a'
+                          ? parentGame?.origem_b
+                          : parentGame?.origem_a
+                        const siblingSlot = siblingNum ? bracketData.slots.get(siblingNum) : undefined
+                        if (siblingSlot) {
+                          const mid = (slot.row + siblingSlot.row) / 2
+                          connectorH = Math.abs(mid - slot.row) * ROW_H
+                          isTopChild = ci.type === 'a'
+                        }
+                      }
+
+                      // Parent connectors: pure horizontal lines toward children's column
+                      const parentDirs: Set<'l' | 'r'> = new Set()
+                      if (hasChildren) {
+                        for (const origem of [g.origem_a, g.origem_b]) {
+                          if (!origem) continue
+                          const childSlot = bracketData.slots.get(origem)
+                          if (!childSlot) continue
+                          parentDirs.add(childSlot.col < slot.col ? 'l' : 'r')
+                        }
+                      }
+
                       return (
-                        <div key={`${fase}-${i}`} className="bg-stone-900/50 border border-dashed border-stone-800 rounded-xl p-3 text-center relative">
-                          <span className="text-xs text-stone-600">A definir</span>
-                          {/* Arrow to next round */}
-                          {roundIdx < ROUND_CONFIG.length - 1 && (
-                            <div className="absolute -right-4 top-1/2 -translate-y-1/2 text-stone-700">
-                              <ArrowRight size={12} />
-                            </div>
-                          )}
+                        <div
+                          key={num}
+                          className="absolute"
+                          style={{
+                            left: '50%',
+                            transform: 'translateX(-50%)',
+                            top: slot.row * ROW_H - (isFinal || isThird ? 28 : 26),
+                          }}
+                        >
+                          <div className="relative">
+                            {isFinal ? (
+                              <div className="flex flex-col items-center gap-1">
+                                <div className="text-[10px] text-stone-500 uppercase tracking-wider font-bold">Grande Final</div>
+                                <GameSlot g={g} highlight />
+                              </div>
+                            ) : isThird ? (
+                              <div className="text-center">
+                                <div className="text-[10px] text-stone-500 mb-0.5">3º lugar</div>
+                                <GameSlot g={g} />
+                              </div>
+                            ) : (
+                              <GameSlot g={g} highlight={getWinner(g) !== null} />
+                            )}
+
+                            {/* Parent connector: pure horizontal line toward children's column */}
+                            {Array.from(parentDirs).map((d) => (
+                              <div
+                                key={d}
+                                className="absolute pointer-events-none top-1/2 -translate-y-1/2"
+                                style={{
+                                  [d === 'r' ? 'left' : 'right']: '100%',
+                                  width: 12,
+                                  height: 1,
+                                }}
+                              >
+                                <svg width="12" height="1" viewBox="0 0 12 1">
+                                  <line
+                                    x1={d === 'r' ? "0" : "12"}
+                                    y1="0.5"
+                                    x2={d === 'r' ? "12" : "0"}
+                                    y2="0.5"
+                                    stroke="rgb(120 113 108)" strokeWidth="1.5"
+                                  />
+                                </svg>
+                              </div>
+                            ))}
+
+                            {/* Child connector: L-shaped line toward parent */}
+                            {isChild && connectorH > 0 && (
+                              <ConnectorLine
+                                dir={childDir}
+                                top={isTopChild ? '50%' : `calc(50% - ${connectorH}px)`}
+                                h={connectorH}
+                                topChild={isTopChild}
+                              />
+                            )}
+                          </div>
                         </div>
                       )
-                    }
-
-                    const winner = getWinner(g.resultado)
-                    const hasResult = !!g.resultado
-                    const jogoNum = g.jogo_numero
-
-                    return (
-                      <div key={jogoNum} className={clsx(
-                        'bg-stone-900 border rounded-xl p-3 relative',
-                        hasResult ? 'border-emerald-500/20' : 'border-stone-800'
-                      )}>
-                        <div className="text-[10px] text-stone-600 font-mono mb-1.5 text-center">
-                          #{jogoNum}
-                        </div>
-                        <div className="space-y-1">
-                          <div className={clsx(
-                            'flex items-center justify-between gap-1 px-2 py-1 rounded text-xs',
-                            winner === 'A' ? 'bg-emerald-500/10 text-emerald-300 font-bold' : 'text-stone-400'
-                          )}>
-                            <span className="truncate min-w-0 max-w-24"><TeamWithFlag name={g.pais_a} /></span>
-                            {hasResult && <span className="font-mono shrink-0">{g.resultado!.gol_a}</span>}
-                            {!hasResult && g.pais_a && <span className="text-stone-600 text-[10px] shrink-0">-</span>}
-                          </div>
-                          <div className={clsx(
-                            'flex items-center justify-between gap-1 px-2 py-1 rounded text-xs',
-                            winner === 'B' ? 'bg-emerald-500/10 text-emerald-300 font-bold' : 'text-stone-400'
-                          )}>
-                            <span className="truncate min-w-0 max-w-24"><TeamWithFlag name={g.pais_b} /></span>
-                            {hasResult && <span className="font-mono shrink-0">{g.resultado!.gol_b}</span>}
-                            {!hasResult && g.pais_b && <span className="text-stone-600 text-[10px] shrink-0">-</span>}
-                          </div>
-                          {hasResult && g.resultado!.penalti_a != null && (
-                            <div className="text-[10px] text-stone-600 text-center mt-1">
-                              pên: {g.resultado!.penalti_a} × {g.resultado!.penalti_b}
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Arrow to next round */}
-                        {roundIdx < ROUND_CONFIG.length - 1 && (
-                          <div className="absolute -right-4 top-1/2 -translate-y-1/2 text-stone-700">
-                            <ArrowRight size={12} />
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
+                    })}
                 </div>
               </div>
             )
@@ -185,47 +383,13 @@ export function KnockoutBracket({
         </div>
       </div>
 
-      {/* 3º Lugar */}
-      <div>
-        <div className="flex items-center gap-3 mb-4">
-          <h2 className="text-sm font-bold text-stone-400 uppercase tracking-wider">
-            {getFaseLabel('Disputa_Terceiro')}
-          </h2>
-          <div className="flex-1 h-px bg-stone-800" />
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-          {terceiroGames.length === 0 || (!terceiroGames[0]?.pais_a && !terceiroGames[0]?.pais_b) ? (
-            <div className="bg-stone-900/50 border border-dashed border-stone-800 rounded-xl p-4 text-center col-span-full">
-              <span className="text-stone-600 text-sm">A definir</span>
-            </div>
-          ) : (
-            terceiroGames.map((g) => (
-              <div key={g.jogo_numero} className="bg-stone-900 border border-stone-800 rounded-xl p-4">
-                <div className="text-xs text-stone-600 font-mono mb-2">#{g.jogo_numero}</div>
-                <div className="flex items-center justify-between gap-2 mb-2">
-                  <span className="font-semibold text-white text-sm truncate"><TeamWithFlag name={g.pais_a} /></span>
-                  <span className="text-stone-600 text-xs">vs</span>
-                  <span className="font-semibold text-white text-sm truncate"><TeamWithFlag name={g.pais_b} /></span>
-                </div>
-                {g.resultado && (
-                  <div className="text-center text-emerald-400 font-mono font-bold">
-                    {g.resultado.gol_a} × {g.resultado.gol_b}
-                  </div>
-                )}
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-
-      {/* Champion */}
       {champion && (
         <div className="text-center py-6">
           <div className="inline-flex items-center gap-3 bg-amber-500/10 border border-amber-500/30 rounded-2xl px-8 py-6">
             <Trophy className="text-amber-400" size={32} />
             <div>
               <p className="text-xs text-amber-400/80 uppercase tracking-wider font-bold">Campeão</p>
-              <p className="text-2xl font-black text-white"><TeamWithFlag name={champion} /></p>
+              <p className="text-2xl font-black text-white"><FlagOnly name={champion} /> {champion}</p>
             </div>
           </div>
         </div>

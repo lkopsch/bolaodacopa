@@ -216,23 +216,19 @@ export default function Home() {
       <div className="max-w-6xl mx-auto px-4 py-6">
         {/* Desktop tabs */}
         <div className="hidden sm:flex gap-1 bg-stone-900 border border-stone-800 rounded-xl p-1 mb-6 w-fit">
-          {(['ranking', 'jogos', 'mata-mata', 'palpites'] as Tab[]).map((t) => {
-            const blocked = t === 'mata-mata'
-            return (
+          {(['ranking', 'jogos', 'mata-mata', 'palpites'] as Tab[]).map((t) => (
             <button
               key={t}
-              onClick={() => { if (!blocked) setTab(t); setMobileMenuOpen(false) }}
+              onClick={() => { setTab(t); setMobileMenuOpen(false) }}
               className={clsx(
                 'px-5 py-2 rounded-lg text-sm font-semibold transition-all',
                 tab === t && 'bg-emerald-600 text-white shadow',
-                blocked && 'opacity-40 cursor-not-allowed',
-                !blocked && tab !== t && 'text-stone-400 hover:text-white'
+                tab !== t && 'text-stone-400 hover:text-white'
               )}
             >
               {t === 'ranking' ? '🏅 Classificação' : t === 'jogos' ? '🏆 A Copa' : t === 'mata-mata' ? '⚔️ Mata Mata' : '📋 Palpites'}
             </button>
-            )
-          })}
+          ))}
         </div>
 
         {/* Mobile hamburger */}
@@ -250,23 +246,19 @@ export default function Home() {
           </button>
           {mobileMenuOpen && (
             <div className="mt-1 bg-stone-900 border border-stone-800 rounded-xl overflow-hidden">
-              {(['ranking', 'jogos', 'mata-mata', 'palpites'] as Tab[]).map((t) => {
-                const blocked = t === 'mata-mata'
-                return (
-                  <button
-                    key={t}
-                    onClick={() => { if (!blocked) { setTab(t); setMobileMenuOpen(false) } }}
-                    className={clsx(
-                      'w-full text-left px-4 py-3 text-sm font-semibold transition-all border-b border-stone-800 last:border-b-0',
-                      tab === t && 'bg-emerald-600/20 text-emerald-400',
-                      blocked && 'opacity-40 cursor-not-allowed',
-                      !blocked && tab !== t && 'text-stone-400 hover:text-white hover:bg-stone-800'
-                    )}
-                  >
-                    {t === 'ranking' ? '🏅 Classificação' : t === 'jogos' ? '🏆 A Copa' : t === 'mata-mata' ? '⚔️ Mata Mata' : '📋 Palpites'}
-                  </button>
-                )
-              })}
+              {(['ranking', 'jogos', 'mata-mata', 'palpites'] as Tab[]).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => { setTab(t); setMobileMenuOpen(false) }}
+                  className={clsx(
+                    'w-full text-left px-4 py-3 text-sm font-semibold transition-all border-b border-stone-800 last:border-b-0',
+                    tab === t && 'bg-emerald-600/20 text-emerald-400',
+                    tab !== t && 'text-stone-400 hover:text-white hover:bg-stone-800'
+                  )}
+                >
+                  {t === 'ranking' ? '🏅 Classificação' : t === 'jogos' ? '🏆 A Copa' : t === 'mata-mata' ? '⚔️ Mata Mata' : '📋 Palpites'}
+                </button>
+              ))}
             </div>
           )}
         </div>
@@ -364,9 +356,7 @@ export default function Home() {
             )}
 
             {tab === 'mata-mata' && (
-              <div className="bg-stone-900 border border-stone-800 rounded-2xl p-6">
-                <KnockoutBracket jogos={jogos} resultados={resultados} />
-              </div>
+              <KnockoutBracket jogos={jogos} resultados={resultados} />
             )}
 
             {tab === 'palpites' && (

@@ -1,7 +1,7 @@
 'use client'
 
 import clsx from 'clsx'
-import { calcularPontos } from '@/types'
+import { calcularPontos, descreverPontos } from '@/types'
 import type { Palpite, Resultado } from '@/types'
 import { getFaseLabel } from '@/lib/excel-parser'
 import { TeamWithFlag } from '@/lib/countryFlags'
@@ -16,6 +16,7 @@ interface MatchCardProps {
 
 export function MatchCard({ palpite, resultado, showPoints = true, compact = false }: MatchCardProps) {
   const pontos = resultado ? calcularPontos(palpite, resultado) : null
+  const descricao = resultado ? descreverPontos(palpite, resultado) : undefined
   const temPenalti = resultado?.penalti_a !== null && resultado?.penalti_a !== undefined
 
   return (
@@ -37,7 +38,7 @@ export function MatchCard({ palpite, resultado, showPoints = true, compact = fal
             <span className="text-xs text-stone-600">Grupo {palpite.grupo}</span>
           )}
         </div>
-        {showPoints && <ScoreBadge pontos={pontos} size="sm" />}
+        {showPoints && <ScoreBadge pontos={pontos} size="sm" descricao={descricao} />}
       </div>
 
       {/* Palpite Score */}

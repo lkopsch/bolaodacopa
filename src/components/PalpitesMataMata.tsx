@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react'
 import type { Palpite, Resultado, Jogo } from '@/types'
-import { calcularPontosMataMata, calcularAcertosConfronto } from '@/types'
+import { calcularPontosMataMata, calcularAcertosConfronto, descreverPontosMataMata } from '@/types'
 import { getFaseLabel } from '@/lib/excel-parser'
 import { TeamWithFlag } from '@/lib/countryFlags'
 import { ScoreBadge } from './ScoreBadge'
@@ -84,6 +84,7 @@ export function PalpitesMataMata({
                     const resultado = resultadoMap.get(p.jogo_numero)
                     const jogo = jogoMap.get(p.jogo_numero)
                     const pontos = resultado && jogo ? calcularPontosMataMata(p, resultado, jogo) : null
+                    const descricao = resultado && jogo ? descreverPontosMataMata(p, resultado, jogo) : undefined
                     const confronto = jogo ? calcularAcertosConfronto(p, jogo) : null
                     return (
                       <tr key={`${p.nome_participante}-${p.jogo_numero}`} className="hover:bg-stone-800/40 transition-colors">
@@ -129,7 +130,7 @@ export function PalpitesMataMata({
                           )}
                         </td>
                         <td className="py-2 text-right">
-                          <ScoreBadge pontos={pontos} size="sm" />
+                          <ScoreBadge pontos={pontos} size="sm" descricao={descricao} />
                         </td>
                       </tr>
                     )

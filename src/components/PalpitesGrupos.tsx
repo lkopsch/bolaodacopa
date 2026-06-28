@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react'
 import type { Palpite, Resultado, Jogo } from '@/types'
-import { calcularPontos } from '@/types'
+import { calcularPontos, descreverPontos } from '@/types'
 import { TeamWithFlag } from '@/lib/countryFlags'
 import { ScoreBadge } from './ScoreBadge'
 import clsx from 'clsx'
@@ -110,6 +110,7 @@ export function PalpitesGrupos({
                 {participantesOrdenados.map((nome) => {
                   const palpite = palpitesDoJogo.get(nome)
                   const pontos = palpite && resultado ? calcularPontos(palpite, resultado) : null
+                  const descricao = palpite && resultado ? descreverPontos(palpite, resultado) : undefined
                   return (
                     <td key={nome} className="py-1 px-1 text-center align-top" style={{ minWidth: colWidth, width: colWidth, maxWidth: colWidth }}>
                       {palpite ? (
@@ -118,7 +119,7 @@ export function PalpitesGrupos({
                             {palpite.gol_a}×{palpite.gol_b}
                           </span>
                           {pontos !== null && (
-                            <ScoreBadge pontos={pontos} size="sm" />
+                            <ScoreBadge pontos={pontos} size="sm" descricao={descricao} />
                           )}
                           {pontos === null && (
                             <span className="text-transparent text-[10px] leading-none">—</span>

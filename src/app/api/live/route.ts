@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabase, supabaseAdmin } from '@/lib/supabase'
 import type { Jogo } from '@/types'
 import { isAdminRequest } from '@/lib/auth'
+import { advanceWinner } from '@/lib/knockout-resolve'
 
 // GET /api/live — retorna jogos ao vivo com placar atual
 export async function GET() {
@@ -80,17 +81,23 @@ export async function GET() {
     const diffMs = agora.getTime() - dt.getTime()
     if (diffMs > 3 * 60 * 60 * 1000) {
       // Finaliza com o placar atual
+      const autoGolA = live.gol_a
+      const autoGolB = live.gol_b
+
       await supabaseAdmin.from('resultados').upsert(
         {
           jogo_numero: jogoNumero,
-          gol_a: live.gol_a,
-          gol_b: live.gol_b,
+          gol_a: autoGolA,
+          gol_b: autoGolB,
           penalti_a: null,
           penalti_b: null,
         },
         { onConflict: 'jogo_numero' }
       )
       await supabaseAdmin.from('jogos_ao_vivo').delete().eq('jogo_numero', jogoNumero)
+
+      await advanceWinner(jogoNumero, autoGolA, autoGolB, null, null)
+
       autoFinalizados.push(jogoNumero)
       aoVivoMap.delete(jogoNumero)
     }
@@ -157,18 +164,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Jogo não está ao vivo' }, { status: 400 })
     }
 
+    const endGolA = liveAtual.gol_a
+    const endGolB = liveAtual.gol_b
+    const endPenA = liveAtual.penalti_a ?? null
+    const endPenB = liveAtual.penalti_b ?? null
+
     await supabaseAdmin.from('resultados').upsert(
       {
         jogo_numero,
-        gol_a: liveAtual.gol_a,
-        gol_b: liveAtual.gol_b,
-        penalti_a: liveAtual.penalti_a ?? null,
-        penalti_b: liveAtual.penalti_b ?? null,
+        gol_a: endGolA,
+        gol_b: endGolB,
+        penalti_a: endPenA,
+        penalti_b: endPenB,
       },
       { onConflict: 'jogo_numero' }
     )
 
     await supabaseAdmin.from('jogos_ao_vivo').delete().eq('jogo_numero', jogo_numero)
+
+    await advanceWinner(jogo_numero, endGolA, endGolB, endPenA, endPenB)
 
     return NextResponse.json({ message: `Jogo ${jogo_numero} finalizado!` })
   }
