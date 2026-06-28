@@ -35,16 +35,23 @@ function buildRanking(
     const jogo = jogosMap.get(palpite.jogo_numero)
     const isKnockout = palpite.fase !== 'Grupos'
 
-    // MM counts confronto acertos even without resultado (times são conhecidos do bracket)
     if (isKnockout && jogo) {
-      entry.mm_acertos += calcularAcertosConfronto(palpite, jogo)
-    }
+      const confrontoAcertos = calcularAcertosConfronto(palpite, jogo)
+      entry.mm_acertos += confrontoAcertos
 
-    if (resultado) {
-      const pontos = (jogo && isKnockout)
-        ? calcularPontosMataMata(palpite, resultado, jogo)
-        : calcularPontos(palpite, resultado)
+      if (resultado) {
+        const pontos = calcularPontosMataMata(palpite, resultado, jogo)
+        entry.pontos_total += pontos
 
+        if (pontos === 10) entry.acertos_placar++
+        else if (pontos >= 5) entry.acertos_resultado++
+        else if (pontos === 1) entry.acertos_um_lado++
+        else entry.erros++
+      } else {
+        entry.pontos_total += confrontoAcertos * 5
+      }
+    } else if (resultado) {
+      const pontos = calcularPontos(palpite, resultado)
       entry.pontos_total += pontos
 
       if (pontos === 10) entry.acertos_placar++

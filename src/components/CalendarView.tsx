@@ -146,46 +146,30 @@ export function CalendarView({ jogos, resultados, palpites = [] }: { jogos: Jogo
     const now = new Date()
     for (const j of groupGamesSorted) {
       if (!j.data_hora) continue
-      if (new Date(j.data_hora) > now && !resultadoMap.has(j.jogo_numero)) {
+      const jDate = new Date(j.data_hora)
+      if (isNaN(jDate.getTime())) continue
+      if (jDate > now && !resultadoMap.has(j.jogo_numero)) {
         return j.jogo_numero
       }
     }
     return null
   }, [groupGamesSorted, resultadoMap])
 
-  const firstLiveOrNextIdx = useMemo(() => {
-    const now = new Date()
-    // Find first live game
-    for (let i = 0; i < groupGamesSorted.length; i++) {
-      if (liveGameNumeros.has(groupGamesSorted[i].jogo_numero)) return i
-    }
-    // No live games — find first upcoming game
-    for (let i = 0; i < groupGamesSorted.length; i++) {
-      const j = groupGamesSorted[i]
-      if (!j.data_hora) continue
-      if (new Date(j.data_hora) >= now && !resultadoMap.has(j.jogo_numero)) return i
-    }
-    return 0
-  }, [groupGamesSorted, liveGameNumeros, resultadoMap])
-
   const filteredGamesByDate = useMemo(() => {
     if (showAllFase) return gamesByDate
 
-    const cutoffIdx = firstLiveOrNextIdx
+    if (nextGameNum === null) return gamesByDate
 
-    // Group-level filtering: keep only games at or after the cutoff,
-    // plus any live games before the cutoff
     return gamesByDate
       .map(([key, val]) => {
         const activeGames = val.games.filter((g) => {
           if (liveGameNumeros.has(g.jogo_numero)) return true
-          const idx = groupGamesSorted.findIndex((jg) => jg.jogo_numero === g.jogo_numero)
-          return idx >= cutoffIdx
+          return g.jogo_numero === nextGameNum
         })
         return [key, { ...val, games: activeGames }] as [string, { label: string; games: Jogo[] }]
       })
       .filter(([, val]) => val.games.length > 0)
-  }, [gamesByDate, groupGamesSorted, firstLiveOrNextIdx, liveGameNumeros, showAllFase])
+  }, [gamesByDate, nextGameNum, liveGameNumeros, showAllFase])
 
   const totalFinished = groupGamesSorted.length - filteredGamesByDate.reduce((acc, [, v]) => acc + v.games.length, 0)
 
