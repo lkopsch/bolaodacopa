@@ -8,7 +8,7 @@ import { RankingTable } from '@/components/RankingTable'
 import { PalpitesGrupos } from '@/components/PalpitesGrupos'
 import { PalpitesMataMata } from '@/components/PalpitesMataMata'
 import { CalendarView } from '@/components/CalendarView'
-import { KnockoutBracket } from '@/components/KnockoutBracket'
+import { CircularKnockout } from '@/components/CircularKnockout'
 import { TeamWithFlag, FlagOnly } from '@/lib/countryFlags'
 import { useAuth } from '@/contexts/AuthContext'
 import { AuthModal } from '@/components/AuthModal'
@@ -356,7 +356,7 @@ export default function Home() {
             )}
 
             {tab === 'mata-mata' && (
-              <KnockoutBracket jogos={jogos} resultados={resultados} />
+              <CircularKnockout jogos={jogos} resultados={resultados} />
             )}
 
             {tab === 'palpites' && (
