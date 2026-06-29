@@ -187,14 +187,22 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: `Jogo ${jogo_numero} finalizado!` })
   }
 
-  // Update placar ao vivo
+  // Só sobrescreve campos que foram enviados; preserva os existentes
+  const { data: current } = await supabaseAdmin
+    .from('jogos_ao_vivo')
+    .select('*')
+    .eq('jogo_numero', jogo_numero)
+    .single()
+
+  const cur = current ?? { gol_a: 0, gol_b: 0, penalti_a: null, penalti_b: null }
+
   const { error } = await supabaseAdmin.from('jogos_ao_vivo').upsert(
     {
       jogo_numero,
-      gol_a: gol_a ?? 0,
-      gol_b: gol_b ?? 0,
-      penalti_a: penalti_a ?? null,
-      penalti_b: penalti_b ?? null,
+      gol_a: gol_a !== undefined ? gol_a : cur.gol_a,
+      gol_b: gol_b !== undefined ? gol_b : cur.gol_b,
+      penalti_a: penalti_a !== undefined ? penalti_a : cur.penalti_a,
+      penalti_b: penalti_b !== undefined ? penalti_b : cur.penalti_b,
     },
     { onConflict: 'jogo_numero' }
   )
