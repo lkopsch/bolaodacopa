@@ -130,10 +130,7 @@ export function calcularPontosMataMata(palpite: Palpite, resultado: Resultado, j
 
   if (palpiteOutcome === resOutcome) pontos += 5
 
-  let isExactScore = palpite.gol_a === resultado.gol_a && palpite.gol_b === resultado.gol_b
-  if (isExactScore && resultado.penalti_a !== null && palpite.penalti_a !== null) {
-    isExactScore = palpite.penalti_a === resultado.penalti_a && palpite.penalti_b === resultado.penalti_b
-  }
+  const isExactScore = palpite.gol_a === resultado.gol_a && palpite.gol_b === resultado.gol_b
 
   if (isExactScore) {
     pontos += 3
@@ -194,10 +191,7 @@ export function descreverPontosMataMata(palpite: Palpite, resultado: Resultado, 
 
   itens.push(...descreverItens(resultado, palpite))
 
-  let isExactScore = palpite.gol_a === resultado.gol_a && palpite.gol_b === resultado.gol_b
-  if (isExactScore && resultado.penalti_a !== null && palpite.penalti_a !== null) {
-    isExactScore = palpite.penalti_a === resultado.penalti_a && palpite.penalti_b === resultado.penalti_b
-  }
+  const isExactScore = palpite.gol_a === resultado.gol_a && palpite.gol_b === resultado.gol_b
 
   if (isExactScore) {
     itens.push('3pt bônus placar exato')
