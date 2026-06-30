@@ -9,12 +9,13 @@ import { PalpitesGrupos } from '@/components/PalpitesGrupos'
 import { PalpitesMataMata } from '@/components/PalpitesMataMata'
 import { CalendarView } from '@/components/CalendarView'
 import { CircularKnockout } from '@/components/CircularKnockout'
+import { HistoricoView } from '@/components/HistoricoView'
 import { TeamWithFlag, FlagOnly } from '@/lib/countryFlags'
 import { useAuth } from '@/contexts/AuthContext'
 import { AuthModal } from '@/components/AuthModal'
 import clsx from 'clsx'
 
-type Tab = 'ranking' | 'jogos' | 'mata-mata' | 'palpites'
+type Tab = 'ranking' | 'jogos' | 'mata-mata' | 'palpites' | 'historico'
 
 export default function Home() {
   const [tab, setTab] = useState<Tab>('ranking')
@@ -216,7 +217,7 @@ export default function Home() {
       <div className="max-w-6xl mx-auto px-4 py-6">
         {/* Desktop tabs */}
         <div className="hidden sm:flex gap-1 bg-stone-900 border border-stone-800 rounded-xl p-1 mb-6 w-fit">
-          {(['ranking', 'jogos', 'mata-mata', 'palpites'] as Tab[]).map((t) => (
+          {(['ranking', 'jogos', 'mata-mata', 'palpites', 'historico'] as Tab[]).map((t) => (
             <button
               key={t}
               onClick={() => { setTab(t); setMobileMenuOpen(false) }}
@@ -226,7 +227,7 @@ export default function Home() {
                 tab !== t && 'text-stone-400 hover:text-white'
               )}
             >
-              {t === 'ranking' ? '🏅 Classificação' : t === 'jogos' ? '🏆 A Copa' : t === 'mata-mata' ? '⚔️ Mata Mata' : '📋 Palpites'}
+              {t === 'ranking' ? '🏅 Classificação' : t === 'jogos' ? '🏆 A Copa' : t === 'mata-mata' ? '⚔️ Mata Mata' : t === 'palpites' ? '📋 Palpites' : '📜 Histórico'}
             </button>
           ))}
         </div>
@@ -246,7 +247,7 @@ export default function Home() {
           </button>
           {mobileMenuOpen && (
             <div className="mt-1 bg-stone-900 border border-stone-800 rounded-xl overflow-hidden">
-              {(['ranking', 'jogos', 'mata-mata', 'palpites'] as Tab[]).map((t) => (
+{(['ranking', 'jogos', 'mata-mata', 'palpites', 'historico'] as Tab[]).map((t) => (
                 <button
                   key={t}
                   onClick={() => { setTab(t); setMobileMenuOpen(false) }}
@@ -256,7 +257,7 @@ export default function Home() {
                     tab !== t && 'text-stone-400 hover:text-white hover:bg-stone-800'
                   )}
                 >
-                  {t === 'ranking' ? '🏅 Classificação' : t === 'jogos' ? '🏆 A Copa' : t === 'mata-mata' ? '⚔️ Mata Mata' : '📋 Palpites'}
+                  {t === 'ranking' ? '🏅 Classificação' : t === 'jogos' ? '🏆 A Copa' : t === 'mata-mata' ? '⚔️ Mata Mata' : t === 'palpites' ? '📋 Palpites' : '📜 Histórico'}
                 </button>
               ))}
             </div>
@@ -357,6 +358,14 @@ export default function Home() {
 
             {tab === 'mata-mata' && (
               <CircularKnockout jogos={jogos} resultados={resultados} />
+            )}
+
+            {tab === 'historico' && (
+              <HistoricoView
+                palpites={palpites}
+                resultados={resultados}
+                jogos={jogos}
+              />
             )}
 
             {tab === 'palpites' && (
